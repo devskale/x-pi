@@ -9,6 +9,26 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
+
+/** FUND 2 (x-pi-zuverlaessigkeit): garantiert tool_result für JEDEX Tool —
+ * auch bei Exception. Ohne dies war ein transienter Tool-Fehler unsichtbar
+ * (Agent narruerte „Tool fehlt", kein tool_result-Event, keine Diagnose). */
+async function safeExecute(
+  name: string,
+  fn: (id: string, params: any) => Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>,
+  id: string,
+  params: any,
+): Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }> {
+  try {
+    return await fn(id, params);
+  } catch (err) {
+    emit({ t: "tool_result", name, ok: false, error: String(err).slice(0, 200) });
+    return {
+      content: [{ type: "text", text: `FEHLER in ${name}: ${String(err).slice(0, 250)}` }],
+      details: {},
+    };
+  }
+}
 import type { FbPiKonfig } from "../konfig.js";
 
 /** Konto-Token (Phase 3): env → credgoo → anonym. Anonym bleiben Details
@@ -234,14 +254,14 @@ export function firmenbuchToolpack(cfg: FbPiKonfig): ((pi: ExtensionAPI) => void
           project: Type.String(),
           bidder: Type.String(),
         }),
-        execute: async (_id, params) => {
-          emit({ t: "tool_call", name: "fn_ermitteln", params });
-          const p = params.project.includes("..") ? null : params.project;
-          const b = params.bidder.includes("..") ? null : params.bidder;
+        execute: async (_id, params) => safeExecute("fn_ermitteln", async (_i, prm) => {
+          emit({ t: "tool_call", name: "fn_ermitteln", params: prm });
+          const p = prm.project?.includes("..") ? null : prm.project;
+          const b = prm.bidder?.includes("..") ? null : prm.bidder;
           const out = p && b ? fnErmitteln(p, b, undefined, cfg.tools.kontext.ofsBase) : { fn: null, quelle: "ungültige Namen" };
           emit({ t: "tool_result", name: "fn_ermitteln", ok: out.fn !== null, fn: out.fn, quelle: out.quelle });
           return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
-        },
+        }, _id, params),
       });
     },
   ];
