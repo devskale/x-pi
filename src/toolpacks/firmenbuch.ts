@@ -1,18 +1,14 @@
-/** firmenindex-Tools — echte Calls gegen skale.dev/firmenindex (Phase 1).
- *
- * API-Form (live verifiziert 2026-10-25):
- *   GET {api}?e=firmen/{fn}/vertretung[&stichtag=YYYY-MM-DD]
- *   → {fn, stichtag, firma, modus, vertretungsbefugte[{name, funktion, seit,
- *      bis?, befugnis{typ, typ_text}}], vertretungsregel, hinweis}
- * Such-Endpunkte sind Token-gegate­d (Phase 3: credgoo-Konto) — das Tool
- * existiert schon, meldet aber laut, wenn der Call 403 ist (Agent fällt auf
- * FN-aus-Kontext zurück, statt still zu raten). */
+/** Toolpack firmenbuch — fb-pi-Missionen (gf_stand): firmenindex-Zugang +
+ * deterministische FN-Auflösung. Ein Toolpack ist eine Datei mit einer
+ * Factory `firmenbuchToolpack(cfg) → Tool-Factories[]`; aktiviert via
+ * x-pi.config.json → toolpacks: ["firmenbuch"] (keine Hardcodings). */
 
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
-
-import { spawnSync } from "node:child_process";
 import type { FbPiKonfig } from "../konfig.js";
 
 /** Konto-Token (Phase 3): env → credgoo → anonym. Anonym bleiben Details
@@ -170,3 +166,83 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
   });
 }
 };
+
+// ── fn_ermitteln (aus dem firmenbuch-Toolpack): FN-Auflösung deterministisch ──
+
+export interface FnFund {
+  fn: string | null;
+  quelle: string;
+  kandidaten?: { fn: string; quelle: string }[];
+  hinweis?: string;
+}
+
+const FN_RE = /\b(\d{4,6}[a-z])\b/g;
+
+export function fnErmitteln(
+  project: string,
+  bidder: string,
+  jobFn: string | undefined,
+  base: string,
+): FnFund {
+  if (jobFn && /^[0-9]{4,6}[a-z]$/.test(jobFn)) return { fn: jobFn, quelle: "job" };
+  const kandidaten: { fn: string; quelle: string }[] = [];
+  const bDir = path.join(base, project, "B", bidder);
+  try {
+    const audit = JSON.parse(readFileSync(path.join(bDir, "audit.json"), "utf8"));
+    const meta = audit.meta;
+    if (meta && typeof meta.fn === "string" && /^[0-9]{4,6}[a-z]$/.test(meta.fn)) {
+      kandidaten.push({ fn: meta.fn, quelle: "audit_meta.fn" });
+    }
+  } catch { /* kein audit.json */ }
+  try {
+    const files = readDirSorted(bDir);
+    const fb = files.filter((f) => /firmenbuch/i.test(f));
+    for (const f of [...fb, ...files.filter((x) => !fb.includes(x))]) {
+      if (!f.endsWith(".meta.json") || f.includes(".backup")) continue;
+      const sc = JSON.parse(readFileSync(path.join(bDir, f), "utf8"));
+      const hay = JSON.stringify(sc);
+      const m = hay.match(FN_RE);
+      if (m && !kandidaten.some((k) => k.fn === m[0])) {
+        kandidaten.push({ fn: m[0], quelle: `sidecar:${f.replace(/\.meta\.json$/, "")}` });
+      }
+    }
+  } catch { /* dir nicht lesbar */ }
+  if (kandidaten.length === 1) return { fn: kandidaten[0].fn, quelle: kandidaten[0].quelle };
+  if (kandidaten.length > 1) {
+    return { fn: kandidaten[0].fn, quelle: kandidaten[0].quelle, kandidaten, hinweis: "mehrere FN-Kandidaten — erste (Firmenbuch-Sidecar bevorzugt)" };
+  }
+  return { fn: null, quelle: "unbelegt", hinweis: "keine FN in job/audit_meta/sidecars gefunden" };
+}
+
+function readDirSorted(dir: string): string[] {
+  return existsSync(dir) ? readdirSync(dir).sort() : [];
+}
+
+export function firmenbuchToolpack(cfg: FbPiKonfig): ((pi: ExtensionAPI) => void)[] {
+  return [
+    firmenindexTools(cfg),
+    (pi: ExtensionAPI): void => {
+      pi.registerTool({
+        name: "fn_ermitteln",
+        label: "FN ermitteln (deterministisch)",
+        description:
+          "Ermittelt die Firmenbuchnummer DETERMINISTISCH aus job → audit.meta.fn → " +
+          "Sidecars (Firmenbuch-Auszüge zuerst). Liefert {fn, quelle, kandidaten?} — " +
+          "fn null heißt: unbelegt. NIE eine FN aus Erinnerung behaupten; nutze " +
+          "IMMER dieses Tool als FN-Quelle (quelle geht 1:1 in den Bericht).",
+        parameters: Type.Object({
+          project: Type.String(),
+          bidder: Type.String(),
+        }),
+        execute: async (_id, params) => {
+          emit({ t: "tool_call", name: "fn_ermitteln", params });
+          const p = params.project.includes("..") ? null : params.project;
+          const b = params.bidder.includes("..") ? null : params.bidder;
+          const out = p && b ? fnErmitteln(p, b, undefined, cfg.tools.kontext.ofsBase) : { fn: null, quelle: "ungültige Namen" };
+          emit({ t: "tool_result", name: "fn_ermitteln", ok: out.fn !== null, fn: out.fn, quelle: out.quelle });
+          return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+        },
+      });
+    },
+  ];
+}

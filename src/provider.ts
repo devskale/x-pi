@@ -1,6 +1,6 @@
 /** uniinfer/Edge-Provider — pi Custom Provider auf dem OpenAI-kompatiblen
  * uniinfer-Gateway (hab-Route → DGX vLLM). ALLE Parameter aus der Konfig
- * (src/konfig.ts — ENV > fb-pi.config.json > Defaults). Fallback = harter
+ * (src/konfig.ts — ENV > x-pi.config.json > Defaults). Fallback = harter
  * Fehler (nie still).
  *
  * Form: "Register a compatible endpoint" (pi docs/custom-provider.md) —

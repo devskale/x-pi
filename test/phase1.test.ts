@@ -11,7 +11,7 @@ test("firmenindex: API-Basis ist der skale.dev-Endpoint (e=-Form, aus Konfig)", 
 });
 
 test("kontext: OFS-Basis aus Konfig (ENV überschreibbar)", () => {
-  const cfg = ladeKonfig({ FB_PI_OFS_BASE: "/custom/base" }, "/gibt/es/nicht");
+  const cfg = ladeKonfig({ X_PI_OFS_BASE: "/custom/base" }, "/gibt/es/nicht");
   assert.equal(cfg.tools.kontext.ofsBase, "/custom/base");
 });
 

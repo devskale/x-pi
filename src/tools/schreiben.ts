@@ -1,7 +1,7 @@
 /** audit_meta_schreiben — der EINZIGE Schreibweg des Agenten (Phase 2).
  * HTTP → robotni fakt_write (Python), der hinter dem bestehenden gelockten
  * ofs-Schreibpfad schreibt — kein Schreib-Codepfad in TS (Plan §3).
- * Token: env FB_PI_FAKT_WRITE_TOKEN (pi5-intern, STS-write-Scope-Äquivalent).
+ * Token: env X_PI_FAKT_WRITE_TOKEN (pi5-intern, STS-write-Scope-Äquivalent).
  * Endpoint validiert Whitelist/Schema/Provenance — Fehler kommen LAUT zurück. */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -59,11 +59,11 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
     }),
     execute: async (_id, params) => {
       emit({ t: "tool_call", name: "audit_meta_schreiben", params: { project: params.project, bidder: params.bidder } });
-      const token = process.env.FB_PI_FAKT_WRITE_TOKEN?.trim();
+      const token = process.env.X_PI_FAKT_WRITE_TOKEN?.trim();
       if (!token) {
         emit({ t: "tool_result", name: "audit_meta_schreiben", ok: false });
         return {
-          content: [{ type: "text", text: "FEHLER: FB_PI_FAKT_WRITE_TOKEN nicht gesetzt — Schreiben verweigert" }],
+          content: [{ type: "text", text: "FEHLER: X_PI_FAKT_WRITE_TOKEN nicht gesetzt — Schreiben verweigert" }],
           details: {},
         };
       }
@@ -79,7 +79,7 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
             bidder: params.bidder,
             fakt,
             payload: params.payload,
-            provenance: { agent: `fb-pi@${version}`, job_id: String(job), quelle: params.payload.quelle },
+            provenance: { agent: `x-pi@${version}`, job_id: String(job), quelle: params.payload.quelle },
           },
           token,
         );

@@ -1,9 +1,9 @@
 {
-  "name": "fb-pi",
-  "version": "0.3.0",
+  "name": "x-pi",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Firmenbuch-Fakt-Agent auf pi-SDK-Basis — Mission gf_stand (Issue fb-pi-bauen, docs/fb-pi-plan-2026-10-25.md)",
+  "description": "x-pi — generischer Fakt-/Methoden-Agent auf pi-SDK-Basis (One-shot, Missionen als Daten, Toolpacks). Erste Mission: gf_stand (Firmenbuch/firmenindex).",
   "scripts": {
     "start": "tsx src/run.ts",
     "selftest": "tsx src/run.ts --selftest",

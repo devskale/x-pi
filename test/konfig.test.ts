@@ -17,18 +17,18 @@ test("defaults gelten ohne Datei und ENV", () => {
 });
 
 test("ENV schlägt Datei schlägt Defaults", () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "fbpi-cfg-"));
-  writeFileSync(path.join(dir, "fb-pi.config.json"), JSON.stringify({
+  const dir = mkdtempSync(path.join(os.tmpdir(), "xpi-cfg-"));
+  writeFileSync(path.join(dir, "x-pi.config.json"), JSON.stringify({
     provider: { model: "aus-datei@x" },
     tools: { kontext: { ofsBase: "/aus-datei" } },
   }));
-  const nurDatei = ladeKonfig({ FB_PI_CONFIG: path.join(dir, "fb-pi.config.json") }, dir);
+  const nurDatei = ladeKonfig({ X_PI_CONFIG: path.join(dir, "x-pi.config.json") }, dir);
   assert.equal(nurDatei.provider.model, "aus-datei@x");
   assert.equal(nurDatei.tools.kontext.ofsBase, "/aus-datei");
   const mitEnv = ladeKonfig({
-    FB_PI_CONFIG: path.join(dir, "fb-pi.config.json"),
-    FB_PI_MODEL: "aus-env@y",
-    FB_PI_OFS_BASE: "/aus-env",
+    X_PI_CONFIG: path.join(dir, "x-pi.config.json"),
+    X_PI_MODEL: "aus-env@y",
+    X_PI_OFS_BASE: "/aus-env",
   }, dir);
   assert.equal(mitEnv.provider.model, "aus-env@y");
   assert.equal(mitEnv.tools.kontext.ofsBase, "/aus-env");

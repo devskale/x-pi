@@ -15,10 +15,10 @@ import { ladeKonfig } from "../src/konfig.js";
 import { ladeMissionen } from "../src/missionen/registry.js";
 import { validiereBericht } from "../src/bericht.js";
 import { kontextTools } from "../src/tools/kontext.js";
-import { firmenindexTools } from "../src/tools/firmenindex.js";
+import { firmenbuchToolpack } from "../src/toolpacks/firmenbuch.js";
 import { schreibenTool } from "../src/tools/schreiben.js";
 
-const BASE = mkdtempSync(path.join(os.tmpdir(), "fbpi-e2e-"));
+const BASE = mkdtempSync(path.join(os.tmpdir(), "xpi-e2e-"));
 const BID = path.join(BASE, "Arbeitsschuhe", "B", "Georg Traugott GmbH");
 mkdirSync(BID, { recursive: true });
 writeFileSync(path.join(BASE, "Arbeitsschuhe", "projekt.json"), JSON.stringify({
@@ -29,7 +29,7 @@ writeFileSync(path.join(BID, "2025-01-21 Firmenbuchauszug.pdf.meta.json"), JSON.
   details: { firmenbuchnummer: "195777h" },
 }));
 
-const cfg = ladeKonfig({ FB_PI_OFS_BASE: BASE, FB_PI_FAKT_URL: "http://fakt.test/write" }, "/gibt/es/nicht");
+const cfg = ladeKonfig({ X_PI_OFS_BASE: BASE, X_PI_FAKT_URL: "http://fakt.test/write" }, "/gibt/es/nicht");
 
 // Fake-pi: Tool-Definitionen fangen statt registrieren
 function fange(factory: (pi: any) => void): any[] {
@@ -48,7 +48,7 @@ const execTool = async (defs: any[], name: string, params: any): Promise<any> =>
 };
 
 const kt = fange((pi: any) => kontextTools(cfg as any)(pi));
-const fi = fange((pi: any) => firmenindexTools(cfg as any)(pi));
+const fi = fange((pi: any) => { for (const f of firmenbuchToolpack(cfg as any)) f(pi); });
 const sc = fange((pi: any) => schreibenTool(cfg as any, "0.3.0-test")(pi));
 
 test.after(() => rmSync(BASE, { recursive: true, force: true }));
@@ -60,8 +60,8 @@ test("Mission gf_stand vorhanden und schreibt (Registry)", () => {
   assert.equal(m.schreiben.enabled, true);
 });
 
-test("Schritt 1+2: fn_ermitteln + projekt_lesen (echte Tool-Executes auf Fixture)", async () => {
-  const fn = await execTool(kt, "fn_ermitteln", { project: "Arbeitsschuhe", bidder: "Georg Traugott GmbH" });
+test("Schritt 1+2: fn_ermitteln (Toolpack!) + projekt_lesen (echte Executes)", async () => {
+  const fn = await execTool(fi, "fn_ermitteln", { project: "Arbeitsschuhe", bidder: "Georg Traugott GmbH" });
   assert.equal(fn.fn, "195777h");
   assert.equal(fn.quelle, "sidecar:2025-01-21 Firmenbuchauszug.pdf");
 
@@ -108,7 +108,7 @@ test("namens_konsistenz löst Umbenennung über former_names (HoRa-Vorfall)", as
 });
 
 test("Schritt 6: schreiben + READ-BACK bestätigt den Fakt im Bestand", async (t) => {
-  process.env.FB_PI_FAKT_WRITE_TOKEN = "e2e-token";
+  process.env.X_PI_FAKT_WRITE_TOKEN = "e2e-token";
   t.mock.method(globalThis, "fetch", async () => new Response(
     JSON.stringify({ ok: true, written: "meta.gf_stand" }), { status: 200 },
   ));
@@ -135,7 +135,7 @@ test("Schritt 6: schreiben + READ-BACK bestätigt den Fakt im Bestand", async (t
   const audit = JSON.parse(readFileSync(path.join(BID, "audit.json"), "utf8"));
   audit.meta.gf_stand = {
     ...payload, stand: "vollständig",
-    _provenance: { agent: "fb-pi@0.3.0-test", ts: "now" },
+    _provenance: { agent: "x-pi@0.3.0-test", ts: "now" },
   };
   writeFileSync(path.join(BID, "audit.json"), JSON.stringify(audit));
 
@@ -144,7 +144,7 @@ test("Schritt 6: schreiben + READ-BACK bestätigt den Fakt im Bestand", async (t
   });
   assert.equal(r2.read_back.ok, true, "mit stehendem Fakt muss read_back.ok=true");
   assert.equal(r2.read_back.n_vertretungsbefugte, 1);
-  delete process.env.FB_PI_FAKT_WRITE_TOKEN;
+  delete process.env.X_PI_FAKT_WRITE_TOKEN;
 });
 
 test("Bericht-Gate: prose+fenced JSON valid, defekter Bericht schlägt fehl", () => {

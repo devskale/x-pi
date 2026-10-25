@@ -1,7 +1,7 @@
 /** Konfiguration — alles Betriebsparameter, nichts hardcoded (User-Regel
  * 2026-10-25: „keine hardcodings, alles konfigurierbar").
  *
- * Präzedenz: ENV > fb-pi.config.json (Pfad via FB_PI_CONFIG) > Defaults hier.
+ * Präzedenz: ENV > x-pi.config.json (Pfad via X_PI_CONFIG) > Defaults hier.
  * NICHT konfigurierbar sind VERTRÄGE (Bericht-Schema der Mission, fakt_write-
  * Whitelist/Auth — Sicherheitsgrenzen sind Code, keine Betriebsparameter). */
 
@@ -30,6 +30,7 @@ export interface FbPiKonfig {
     schreiben: { faktUrl: string };
   };
   missionen: { dir: string };
+  toolpacks: string[];
 }
 
 const DEFAULTS: FbPiKonfig = {
@@ -54,6 +55,7 @@ const DEFAULTS: FbPiKonfig = {
     schreiben: { faktUrl: "http://127.0.0.1:5555/fakt/write" },
   },
   missionen: { dir: "missionen" },
+  toolpacks: ["firmenbuch"],
 };
 
 function deepMerge<T>(base: T, over: unknown): T {
@@ -70,7 +72,7 @@ function deepMerge<T>(base: T, over: unknown): T {
 
 export function ladeKonfig(env: NodeJS.ProcessEnv = process.env, root: string = process.cwd()): FbPiKonfig {
   let cfg = DEFAULTS;
-  const datei = env.FB_PI_CONFIG ?? path.join(root, "fb-pi.config.json");
+  const datei = env.X_PI_CONFIG ?? path.join(root, "x-pi.config.json");
   try {
     cfg = deepMerge(cfg, JSON.parse(readFileSync(datei, "utf8")));
   } catch {
@@ -78,12 +80,12 @@ export function ladeKonfig(env: NodeJS.ProcessEnv = process.env, root: string = 
   }
   // ENV überschreibt gezielt (flache Keys, dokumentiert in README)
   const envMap: [string, (c: FbPiKonfig) => unknown, (c: FbPiKonfig, v: string) => void][] = [
-    ["FB_PI_MODEL", (c) => c.provider.model, (c, v) => (c.provider.model = v)],
-    ["FB_PI_PROVIDER_URL", (c) => c.provider.baseUrl, (c, v) => (c.provider.baseUrl = v)],
+    ["X_PI_MODEL", (c) => c.provider.model, (c, v) => (c.provider.model = v)],
+    ["X_PI_PROVIDER_URL", (c) => c.provider.baseUrl, (c, v) => (c.provider.baseUrl = v)],
     ["FIRMENINDEX_API", (c) => c.tools.firmenindex.apiUrl, (c, v) => (c.tools.firmenindex.apiUrl = v)],
-    ["FB_PI_OFS_BASE", (c) => c.tools.kontext.ofsBase, (c, v) => (c.tools.kontext.ofsBase = v)],
-    ["FB_PI_FAKT_URL", (c) => c.tools.schreiben.faktUrl, (c, v) => (c.tools.schreiben.faktUrl = v)],
-    ["FB_PI_MISSIONEN_DIR", (c) => c.missionen.dir, (c, v) => (c.missionen.dir = v)],
+    ["X_PI_OFS_BASE", (c) => c.tools.kontext.ofsBase, (c, v) => (c.tools.kontext.ofsBase = v)],
+    ["X_PI_FAKT_URL", (c) => c.tools.schreiben.faktUrl, (c, v) => (c.tools.schreiben.faktUrl = v)],
+    ["X_PI_MISSIONEN_DIR", (c) => c.missionen.dir, (c, v) => (c.missionen.dir = v)],
   ];
   for (const [key, , apply] of envMap) {
     if (env[key]?.trim()) apply(cfg, env[key]!.trim());

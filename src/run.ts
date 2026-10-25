@@ -1,5 +1,5 @@
 /** fb-pi CLI — Job-JSON → pi-Session (inMemory) → Mission (datengetrieben) → Bericht.
- * Alles Betriebsparameter kommt aus src/konfig.ts (ENV > fb-pi.config.json > Defaults).
+ * Alles Betriebsparameter kommt aus src/konfig.ts (ENV > x-pi.config.json > Defaults).
  * Missionen: registry lädt missionen/*.config.json — neue Mission ohne Codeänderung. */
 
 import {
@@ -12,7 +12,7 @@ import {
 import { readFileSync } from "node:fs";
 import { emit } from "./protokoll.js";
 import { edgeProviderConfig, resolveGatewayToken } from "./provider.js";
-import { firmenindexTools } from "./tools/firmenindex.js";
+
 import { kontextTools } from "./tools/kontext.js";
 import { statusTool } from "./tools/status.js";
 import { schreibenTool } from "./tools/schreiben.js";
@@ -48,7 +48,7 @@ function parseArgs(argv: string[]): { selftest: boolean; jobJson: string | null 
 async function main(): Promise<number> {
   const { selftest, jobJson } = parseArgs(process.argv.slice(2));
   if (!selftest && !jobJson) {
-    process.stderr.write("usage: fb-pi --selftest | fb-pi --job '<json>'\n");
+    process.stderr.write("usage: x-pi --selftest | fb-pi --job '<json>'\n");
     return 2;
   }
 
@@ -73,7 +73,23 @@ async function main(): Promise<number> {
     agentDir: getAgentDir(),
     systemPromptOverride: () => mission.systemPrompt,
     appendSystemPromptOverride: () => [],
-    extensionFactories: [statusTool, firmenindexTools(cfg), kontextTools(cfg), schreibenTool(cfg, VERSION)],
+    // Toolpacks aus der Konfig (keine Hardcodings): firmenbuch, künftig mehr.
+    const toolpackFactories = cfg.toolpacks.flatMap((name) => {
+      try {
+        // dynamischer Import wäre async — wir mappen synchron über ein Registry-Objekt
+        const packs: Record<string, (c: typeof cfg) => ((pi: any) => void)[]> = {
+          firmenbuch: (c) => require("./toolpacks/firmenbuch.js").firmenbuchToolpack(c),
+        };
+        return packs[name]?.(cfg) ?? [];
+      } catch {
+        return []; // unbekanntes Pack: leer — Fail-loud über Log unten
+      }
+    });
+    if (toolpackFactories.length === 0 && cfg.toolpacks.length > 0) {
+      emit({ t: "error", code: "toolpacks_unavailable", wanted: cfg.toolpacks });
+      return 1;
+    }
+    const extensionFactories = [statusTool, kontextTools(cfg), schreibenTool(cfg, VERSION), ...toolpackFactories];
   });
   await loader.reload();
 
@@ -105,7 +121,7 @@ async function main(): Promise<number> {
   (globalThis as any).__fbpi_job_id = `${job.project}@${job.bidder}@${Date.now()}`;
   emit({
     t: "job_start",
-    agent: `fb-pi@${VERSION}`,
+    agent: `x-pi@${VERSION}`,
     mission: job.fakt,
     mission_name: mission.name,
     job,

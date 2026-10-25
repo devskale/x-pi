@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import { fnErmitteln } from "../src/tools/kontext.js";
+import { fnErmitteln } from "../src/toolpacks/firmenbuch.js";
 
-const BASE = path.join("/tmp", `fbpi-fn-test-${Date.now()}`);
+const BASE = path.join("/tmp", `xpi-fn-test-${Date.now()}`);
 
 function bdir(bidder: string) {
   const d = path.join(BASE, "P", "B", bidder);
