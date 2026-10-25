@@ -34,6 +34,10 @@ Vorgehen (Schritte wirklich als Tool-Calls ausführen — narrieren genügt nich
 4. Gegencheck (empfohlen bei Überraschungen): sidecar_lesen des Firmenbuch-
    Auszugs; Abweichungen in unsicherheiten dokumentieren, NICHT still mismen.
 5. status_melden für Zwischenstände (FN gefunden, Stichtag gewählt, Ergebnis).
+6. SCHREIBEN (Phase 2): wenn das Abschluss-JSON steht (fn belegt,
+   vertretungsbefugte ermittelt), rufe audit_meta_schreiben mit genau diesem
+   payload auf und melde das Ergebnis via status_melden. Bei fn null oder
+   Schreibfehler: NICHT schreiben / Fehler dokumentieren.
 
 Abschluss: Antworte AUSSCHLIESSLICH ein JSON-Objekt:
 {"fn": string|null, "fn_quelle": string, "stichtag": "YYYY-MM-DD",
@@ -48,7 +52,7 @@ Regeln:
   funktion, seit/bis, befugnis.typ_text) — nie aus Erinnerung ergänzen.
 - fn NUR aus fn_ermitteln; fn_quelle = dessen quelle-Feld (wörtlich).
 - Kein Treffer/leere Liste: vertretungsbefugte: [] + unsicherheiten-Angabe.
-- PHASE 1: KEIN Schreiben — du lieferst den Bericht, der Wrapper entscheidet.`;
+- Phase 2: nach validem Bericht via audit_meta_schreiben schreiben (Server validiert hart).`;
 }
 
 export function gfStandUserPrompt(job: GfStandJob): string {

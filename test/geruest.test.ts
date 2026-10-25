@@ -29,7 +29,7 @@ test("mission: Prompt trägt Job-Kontext (FN/Stichtag) und Phase-0-Vertrag", () 
   assert.match(sys, /vertretungsbefugte/);
   assert.match(sys, /status_melden/);
   assert.match(sys, /firmenindex_vertretung/);
-  assert.match(sys, /KEIN Schreiben/);
+  assert.match(sys, /audit_meta_schreiben/);
 });
 
 test("protokoll: emit schreibt genau eine JSONL-Zeile", () => {

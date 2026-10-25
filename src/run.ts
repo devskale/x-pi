@@ -14,6 +14,7 @@ import { MODEL_ID, PROVIDER_ID, registerEdgeProvider, resolveGatewayToken } from
 import { firmenindexTools } from "./tools/firmenindex.js";
 import { kontextTools } from "./tools/kontext.js";
 import { statusTool } from "./tools/status.js";
+import { schreibenTool } from "./tools/schreiben.js";
 import { gfStandSystemPrompt, gfStandUserPrompt, isGfStandJob } from "./missionen/gfStand.js";
 
 const VERSION = "0.0.1";
@@ -42,7 +43,7 @@ async function main(): Promise<number> {
     agentDir: getAgentDir(),
     systemPromptOverride: () => gfStandSystemPrompt(),
     appendSystemPromptOverride: () => [],
-    extensionFactories: [statusTool, firmenindexTools, kontextTools],
+    extensionFactories: [statusTool, firmenindexTools, kontextTools, schreibenTool],
   });
   await loader.reload();
 
@@ -79,6 +80,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
+  (globalThis as any).__fbpi_job_id = `${job.project}@${job.bidder}@${Date.now()}`;
   emit({
     t: "job_start",
     agent: `fb-pi@${VERSION}`,
@@ -92,6 +94,23 @@ async function main(): Promise<number> {
     await session.prompt(gfStandUserPrompt(job));
     const antwort = session.getLastAssistantText();
     emit({ t: "bericht", text: antwort });
+    // Bericht-Validierung (Phase-2-Notiz aus Phase 1: ein Lauf hatte malformed
+    // JSON) — fenced JSON extrahieren, Minimal-Schema prüfen, LAUT im Protokoll.
+    const fenced = antwort.match(/```json\s*([\s\S]*?)```/);
+    const raw = fenced ? fenced[1] : antwort.slice(0, 20000);
+    let bericht_ok = false;
+    let bericht_fehler = "";
+    try {
+      const b = JSON.parse(raw.trim());
+      bericht_ok =
+        typeof b.stichtag === "string" &&
+        Array.isArray(b.vertretungsbefugte) &&
+        typeof b.quelle === "string" &&
+        (b.fn === null || typeof b.fn === "string");
+    } catch (e) {
+      bericht_fehler = String(e).slice(0, 120);
+    }
+    emit({ t: "bericht_valid", ok: bericht_ok, fehler: bericht_fehler || undefined });
     emit({ t: "usage", ...( (usage as object) ?? {}) });
     emit({ t: "job_end", ok: true, elapsed_s: Number(((Date.now() - t0) / 1000).toFixed(1)) });
     return 0;
