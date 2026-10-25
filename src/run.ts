@@ -26,6 +26,13 @@ function parseArgs(argv: string[]): { selftest: boolean; jobJson: string | null 
   let jobJson: string | null = null;
   const i = argv.indexOf("--job");
   if (i !== -1 && argv[i + 1]) jobJson = argv[i + 1];
+  // --job-b64: base64-kodiertes Job-JSON — die robotni-Substitution shlex-
+  // splittet ${param} mit Leerzeichen (JSON/Multiword-Bieter zerreißen);
+  // base64 ist space-frei und überlebt jede Shell-Substitution.
+  const b = argv.indexOf("--job-b64");
+  if (b !== -1 && argv[b + 1]) {
+    jobJson = Buffer.from(argv[b + 1]!, "base64").toString("utf8");
+  }
   return { selftest, jobJson };
 }
 
