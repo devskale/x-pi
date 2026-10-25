@@ -9,6 +9,7 @@ import {
   ModelRuntime,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "node:fs";
 import { emit } from "./protokoll.js";
 import { edgeProviderConfig, resolveGatewayToken } from "./provider.js";
 import { firmenindexTools } from "./tools/firmenindex.js";
@@ -19,7 +20,15 @@ import { ladeKonfig } from "./konfig.js";
 import { validiereBericht } from "./bericht.js";
 import { isMissionJob, ladeMissionen } from "./missionen/registry.js";
 
-const VERSION = "0.2.0";
+// Versions-Drift vermeiden (Vorfall: run.ts sagte 0.2.0 während package.json
+// längst 0.3.0 war): EINE Quelle — package.json.
+const VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 
 function parseArgs(argv: string[]): { selftest: boolean; jobJson: string | null } {
   const selftest = argv.includes("--selftest");
