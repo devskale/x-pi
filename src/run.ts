@@ -16,6 +16,7 @@ import { kontextTools } from "./tools/kontext.js";
 import { statusTool } from "./tools/status.js";
 import { schreibenTool } from "./tools/schreiben.js";
 import { ladeKonfig } from "./konfig.js";
+import { validiereBericht } from "./bericht.js";
 import { isMissionJob, ladeMissionen } from "./missionen/registry.js";
 
 const VERSION = "0.2.0";
@@ -105,43 +106,10 @@ async function main(): Promise<number> {
     await session.prompt(mission.userPrompt(job));
     const antwort = session.getLastAssistantText();
     emit({ t: "bericht", text: antwort });
-    // Bericht-Validierung gegen den MISSIONS-Vertrag (required aus Config).
-    // Extraktion dreistufig: fenced ```json``` → größtes balanciertes JSON im
-    // Text (Modelle schreiben gern Prosa drumherum) → Ganzer Text.
-    const extractJson = (txt: string): string | null => {
-      const fenced = txt.match(/```json\s*([\s\S]*?)```/);
-      if (fenced) return fenced[1]!;
-      let best: string | null = null;
-      for (let i = txt.indexOf("{"); i !== -1; i = txt.indexOf("{", i + 1)) {
-        let tiefe = 0, inStr = false, esc = false;
-        for (let j = i; j < txt.length; j++) {
-          const c = txt[j]!;
-          if (esc) { esc = false; continue; }
-          if (c === "\\") { esc = true; continue; }
-          if (c === '"') inStr = !inStr;
-          if (inStr) continue;
-          if (c === "{") tiefe++;
-          else if (c === "}") { tiefe--; if (tiefe === 0) { const k = txt.slice(i, j + 1); if (!best || k.length > best.length) best = k; break; } }
-        }
-      }
-      return best;
-    };
-    const raw = extractJson(antwort) ?? antwort.slice(0, 20000);
-    let bericht_ok = false;
-    let bericht_fehler = "";
-    try {
-      const b = JSON.parse(raw.trim());
-      const fehlt = mission.bericht.required.filter((k) => !(k in b));
-      bericht_ok =
-        fehlt.length === 0 &&
-        (mission.bericht.fnNullable ? true : typeof b.fn === "string") &&
-        Array.isArray(b.vertretungsbefugte) === true;
-      if (!bericht_ok) bericht_fehler = fehlt.length ? `fehlend: ${fehlt.join(",")}` : "typfehler";
-    } catch (e) {
-      bericht_fehler = String(e).slice(0, 120);
-    }
-    emit({ t: "bericht_valid", ok: bericht_ok, fehler: bericht_fehler || undefined });
-    emit({ t: "usage", ...((usage as object) ?? {}) });
+    const validiert = validiereBericht(antwort, mission);
+    emit({ t: "bericht_valid", ok: validiert.ok, fehler: validiert.fehler || undefined });
+    const bericht_ok = validiert.ok;
+emit({ t: "usage", ...((usage as object) ?? {}) });
     emit({ t: "job_end", ok: bericht_ok, elapsed_s: Number(((Date.now() - t0) / 1000).toFixed(1)) });
     return bericht_ok ? 0 : 1; // invalid Bericht = fehlgeschlagener Lauf
   } catch (err) {

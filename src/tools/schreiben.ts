@@ -8,6 +8,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import type { FbPiKonfig } from "../konfig.js";
 
 export async function faktWrite(url: string, body: unknown, token: string): Promise<Record<string, unknown>> {
@@ -68,6 +70,9 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
       const job = (globalThis as any).__fbpi_job_id ?? "adhoc";
         const fakt = "gf_stand"; // Missions-spezifisch — Tool-Contract bleibt gf_stand in v1
       try {
+        // Read-back (Blaupause §6, SOTA self-verification): nach dem Write
+        // den Fakt aus dem Bestand lesen und fn/stichtag/anzahl vergleichen —
+        // der Agent sieht die Bestätigung, das Protokoll den Beweis.
         const out = await faktWrite(URL_,
           {
             project: params.project,
@@ -78,8 +83,30 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
           },
           token,
         );
-        emit({ t: "tool_result", name: "audit_meta_schreiben", ok: true, written: out.written });
-        return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+        let read_back: Record<string, unknown> = { ok: false, grund: "nicht ausgeführt" };
+        try {
+          const audit = JSON.parse(readFileSync(
+            path.join(cfg.tools.kontext.ofsBase, params.project, "B", params.bidder, "audit.json"), "utf8"));
+          const steht = ((audit as any).meta ?? {})[fakt] ?? null;
+          const p = params.payload;
+          read_back = {
+            ok: !!steht
+              && steht.fn === p.fn
+              && steht.stichtag === p.stichtag
+              && Array.isArray(steht.vertretungsbefugte)
+              && steht.vertretungsbefugte.length === p.vertretungsbefugte.length,
+            fn: steht?.fn ?? null,
+            stichtag: steht?.stichtag ?? null,
+            n_vertretungsbefugte: Array.isArray(steht?.vertretungsbefugte) ? steht.vertretungsbefugte.length : 0,
+          };
+        } catch (e) {
+          read_back = { ok: false, grund: String(e).slice(0, 120) };
+        }
+        emit({ t: "tool_result", name: "audit_meta_schreiben", ok: true, written: out.written, read_back });
+        return {
+          content: [{ type: "text", text: JSON.stringify({ ...out, read_back }) }],
+          details: {},
+        };
       } catch (err) {
         emit({ t: "tool_result", name: "audit_meta_schreiben", ok: false, error: String(err).slice(0, 200) });
         return { content: [{ type: "text", text: `FEHLER: ${String(err).slice(0, 250)}` }], details: {} };

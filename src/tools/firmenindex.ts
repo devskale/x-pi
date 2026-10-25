@@ -52,6 +52,14 @@ async function callFi(
 
 export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
   const API = cfg.tools.firmenindex.apiUrl;
+  const TOKEN = resolveFiToken(cfg.tools.firmenindex.tokenEnv, cfg.tools.firmenindex.tokenCommand);
+  const delayMs = cfg.tools.firmenindex.crawlDelayMs ?? 5000;
+  let lastCall = 0;
+  const throttle = (): void => {
+    const wait = delayMs - (Date.now() - lastCall);
+    if (wait > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+    lastCall = Date.now();
+  };
   return (pi: ExtensionAPI): void => {
   pi.registerTool({
     name: "firmenindex_vertretung",
@@ -104,6 +112,59 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
         out = { verfügbar: false, grund: String(err).slice(0, 150) };
       }
       emit({ t: "tool_result", name: "firmenindex_suche", ok: true });
+      return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+    },
+  });
+
+  // B2 (Blaupause Lücke 4): Namens-Diskrepanzen DETERMINISTISCH auflösen statt
+  // Prompt-Hoffnung — Vorfall KONSTANT/HoRa 25.10.: firmenindex-Name ≠ Bieter-
+  // Name, Auflösung über former_names (Umbenennung), nie still mismen.
+  pi.registerTool({
+    name: "namens_konsistenz",
+    label: "Namens-Konsistenz (deterministisch)",
+    description:
+      "Prüft FN ↔ erwarteter Firmenname über die Suche (current + former_names). " +
+      "Liefert {status: 'konsistent_direkt'|'konsistent_umbenannt'|'inkonsistent'|" +
+      "'fn_nicht_gefunden', name_heute, fruehere_namen, hinweis}. Bei inkonsistent: " +
+      "unsicherheit in den Bericht, NICHT selbst entscheiden.",
+    parameters: Type.Object({
+      fn: Type.String({ description: "Firmenbuchnummer" }),
+      erwarteter_name: Type.String({ description: "Erwarteter Firmenname (z.B. Bietername)" }),
+    }),
+    execute: async (_id, params) => {
+      emit({ t: "tool_call", name: "namens_konsistenz", params });
+      let out: Record<string, unknown>;
+      try {
+        const raw = (await callFi(API, "search", { query: params.erwarteter_name }, TOKEN, throttle)) as any;
+        const treffer = (raw?.results ?? []).find((r: any) => r.fn === params.fn);
+        if (!treffer) {
+          out = {
+            status: "fn_nicht_gefunden",
+            hinweis: `FN ${params.fn} nicht unter Namen ${JSON.stringify(params.erwarteter_name)} — Namen prüfen oder FN über andere Quelle`,
+            gefundene_fns: (raw?.results ?? []).slice(0, 3).map((r: any) => r.fn),
+          };
+        } else if (treffer.name === params.erwarteter_name) {
+          out = { status: "konsistent_direkt", name_heute: treffer.name, fruehere_namen: treffer.former_names ?? [] };
+        } else if (Array.isArray(treffer.former_names) && treffer.former_names.includes(params.erwarteter_name)) {
+          out = {
+            status: "konsistent_umbenannt",
+            name_heute: treffer.name,
+            fruehere_namen: treffer.former_names,
+            hinweis: `Umbenennung: '${params.erwarteter_name}' heißt heute '${treffer.name}' (FN ${params.fn}) — als unsicherheit dokumentieren`,
+          };
+        } else {
+          out = {
+            status: "inkonsistent",
+            name_heute: treffer.name,
+            fruehere_namen: treffer.former_names ?? [],
+            hinweis: "FN trägt diesen Namen weder aktuell noch historisch — Zuordnung anzweifeln, unsicherheit dokumentieren",
+          };
+        }
+        emit({ t: "tool_result", name: "namens_konsistenz", ok: out.status !== "inkonsistent", status: out.status });
+      } catch (err) {
+        out = { status: "fn_nicht_gefunden", hinweis: String(err).slice(0, 150) };
+        emit({ t: "tool_result", name: "namens_konsistenz", ok: false });
+      }
       return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
     },
   });
