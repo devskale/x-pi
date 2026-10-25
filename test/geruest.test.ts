@@ -28,7 +28,8 @@ test("mission: Prompt trägt Job-Kontext (FN/Stichtag) und Phase-0-Vertrag", () 
   const sys = gfStandSystemPrompt();
   assert.match(sys, /vertretungsbefugte/);
   assert.match(sys, /status_melden/);
-  assert.match(sys, /PHASE 0/);
+  assert.match(sys, /firmenindex_vertretung/);
+  assert.match(sys, /KEIN Schreiben/);
 });
 
 test("protokoll: emit schreibt genau eine JSONL-Zeile", () => {

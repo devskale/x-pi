@@ -11,7 +11,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { emit } from "./protokoll.js";
 import { MODEL_ID, PROVIDER_ID, registerEdgeProvider, resolveGatewayToken } from "./provider.js";
-import { fakeToolsExtension } from "./tools/fake.js";
+import { firmenindexTools } from "./tools/firmenindex.js";
+import { kontextTools } from "./tools/kontext.js";
+import { statusTool } from "./tools/status.js";
 import { gfStandSystemPrompt, gfStandUserPrompt, isGfStandJob } from "./missionen/gfStand.js";
 
 const VERSION = "0.0.1";
@@ -40,7 +42,7 @@ async function main(): Promise<number> {
     agentDir: getAgentDir(),
     systemPromptOverride: () => gfStandSystemPrompt(),
     appendSystemPromptOverride: () => [],
-    extensionFactories: [fakeToolsExtension],
+    extensionFactories: [statusTool, firmenindexTools, kontextTools],
   });
   await loader.reload();
 
