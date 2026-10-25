@@ -1,0 +1,24 @@
+{
+  "name": "fb-pi",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Firmenbuch-Fakt-Agent auf pi-SDK-Basis — Mission gf_stand (Issue fb-pi-bauen, docs/fb-pi-plan-2026-10-25.md)",
+  "scripts": {
+    "start": "tsx src/run.ts",
+    "selftest": "tsx src/run.ts --selftest",
+    "test": "node --test --import tsx test/geruest.test.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "^1.4.0",
+    "@sinclair/typebox": "^0.34.52"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
