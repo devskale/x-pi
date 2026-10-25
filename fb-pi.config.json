@@ -8,12 +8,30 @@
     "maxTokens": 32768,
     "thinking": "off",
     "tokenEnv": "UNIINFER_GATEWAY_TOKEN",
-    "tokenCommand": ["credgoo", "uniinfer"]
+    "tokenCommand": [
+      "credgoo",
+      "uniinfer"
+    ]
   },
   "tools": {
-    "firmenindex": { "apiUrl": "https://skale.dev/firmenindex/api" },
-    "kontext": { "ofsBase": "/home/pi/code/dufs/klark0" },
-    "schreiben": { "faktUrl": "http://127.0.0.1:5555/fakt/write" }
+    "firmenindex": {
+      "apiUrl": "https://skale.dev/firmenindex/api",
+      "tokenEnv": "FIRMENINDEX_TOKEN",
+      "tokenCommand": [
+        "credgoo",
+        "firmenindex"
+      ],
+      "crawlDelayMs": 5000,
+      "$comment": "Token via env FIRMENINDEX_TOKEN oder credgoo firmenindex (Konto, Phase 3 — Owner legt an). Ohne Token: anonym (suche/firma 403, vertretung frei). crawlDelayMs = Drossel-Respekt (Service-Vorgabe 5s)."
+    },
+    "kontext": {
+      "ofsBase": "/home/pi/code/dufs/klark0"
+    },
+    "schreiben": {
+      "faktUrl": "http://127.0.0.1:5555/fakt/write"
+    }
   },
-  "missionen": { "dir": "missionen" }
+  "missionen": {
+    "dir": "missionen"
+  }
 }

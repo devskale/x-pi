@@ -12,13 +12,36 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
 
+import { spawnSync } from "node:child_process";
 import type { FbPiKonfig } from "../konfig.js";
 
-async function callFi(apiUrl: string, path: string, params: Record<string, string> = {}): Promise<unknown> {
+/** Konto-Token (Phase 3): env → credgoo → anonym. Anonym bleiben Details
+ * teilweise 403 (suche/firma) — vertretung ist frei. */
+function resolveFiToken(tokenEnv: string, tokenCommand: string[]): string | null {
+  const fromEnv = process.env[tokenEnv]?.trim();
+  if (fromEnv) return fromEnv;
+  const r = spawnSync(tokenCommand[0] ?? "credgoo", tokenCommand.slice(1) ?? [], {
+    encoding: "utf8", timeout: 10_000,
+  });
+  const out = (r.stdout ?? "").trim();
+  return r.status === 0 && out && !out.startsWith("Service not found") ? out : null;
+}
+
+async function callFi(
+  apiUrl: string,
+  path: string,
+  params: Record<string, string> = {},
+  token: string | null = null,
+  throttle?: () => void,
+): Promise<unknown> {
   const url = new URL(apiUrl);
   url.searchParams.set("e", path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+  throttle?.(); // Drossel-Respekt: ≥crawlDelayMs zwischen Calls eines Laufs
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(20_000),
+    ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+  });
   const body = await res.text();
   try {
     return JSON.parse(body);
@@ -46,7 +69,7 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
       emit({ t: "tool_call", name: "firmenindex_vertretung", params });
       let out: unknown;
       try {
-        out = await callFi(API, `firmen/${params.fn}/vertretung`, { stichtag: params.stichtag });
+        out = await callFi(API, `firmen/${params.fn}/vertretung`, { stichtag: params.stichtag }, TOKEN, throttle);
         emit({ t: "tool_result", name: "firmenindex_vertretung", ok: !((out as any)?.error) });
       } catch (err) {
         out = { error: String(err).slice(0, 200) };
@@ -60,9 +83,10 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
     name: "firmenindex_suche",
     label: "Firmenindex-Suche",
     description:
-      "Firmensuche nach Name → FN. HINWEIS: aktuell Token-gegate­d (Phase 3) — " +
-      "bei 'verfügbar: false' NICHT raten: FN stattdessen aus dem Kontext " +
-      "ermitteln (audit_meta_lesen, sidecar_lesen eines Firmenbuch-Dokuments).",
+      "Firmensuche nach Name → FN (FREI: Endpunkt 'search', Param 'query'). " +
+      "Liefert results[{fn, name, legal_form, status, seat, former_names, …}] — " +
+      "former_names löst Umbenennungen auf (wichtig bei Namens-Diskrepanzen). " +
+      "Bei 'verfügbar: false' NICHT raten: FN über fn_ermitteln.",
     parameters: Type.Object({
       query: Type.String({ description: "Firmenname (oder Teil)" }),
     }),
@@ -70,7 +94,7 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
       emit({ t: "tool_call", name: "firmenindex_suche", params });
       let out: unknown;
       try {
-        const raw = (await callFi(API, "suche", { q: params.query })) as Record<string, unknown>;
+        const raw = (await callFi(API, "search", { query: params.query }, TOKEN, throttle)) as Record<string, unknown>;
         if (raw?.error === "Forbidden") {
           out = { verfügbar: false, grund: "suche Token-gegate­d (Konto: Phase 3) — FN aus Kontext ermitteln" };
         } else {

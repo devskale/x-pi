@@ -20,7 +20,12 @@ export interface FbPiKonfig {
     tokenCommand: string[]; // credgoo-Fallback (Befehl + Arg)
   };
   tools: {
-    firmenindex: { apiUrl: string };
+    firmenindex: {
+      apiUrl: string;
+      tokenEnv: string; // env mit Konto-Token (Phase 3; leer = anonym, Details ggf. 403)
+      tokenCommand: string[]; // credgoo-Fallback (Service `firmenindex`)
+      crawlDelayMs: number; // Drossel-Respekt: ≥5s zwischen Calls (Service-Vorgabe)
+    };
     kontext: { ofsBase: string };
     schreiben: { faktUrl: string };
   };
@@ -39,7 +44,12 @@ const DEFAULTS: FbPiKonfig = {
     tokenCommand: ["credgoo", "uniinfer"],
   },
   tools: {
-    firmenindex: { apiUrl: "https://skale.dev/firmenindex/api" },
+    firmenindex: {
+      apiUrl: "https://skale.dev/firmenindex/api",
+      tokenEnv: "FIRMENINDEX_TOKEN",
+      tokenCommand: ["credgoo", "firmenindex"],
+      crawlDelayMs: 5000,
+    },
     kontext: { ofsBase: "/home/pi/code/dufs/klark0" },
     schreiben: { faktUrl: "http://127.0.0.1:5555/fakt/write" },
   },
