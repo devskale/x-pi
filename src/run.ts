@@ -18,6 +18,7 @@ import { statusTool } from "./tools/status.js";
 import { schreibenTool } from "./tools/schreiben.js";
 import { ladeKonfig } from "./konfig.js";
 import { validiereBericht } from "./bericht.js";
+import { firmenbuchToolpack } from "./toolpacks/firmenbuch.js";
 import { isMissionJob, ladeMissionen } from "./missionen/registry.js";
 
 // Versions-Drift vermeiden (Vorfall: run.ts sagte 0.2.0 während package.json
@@ -68,28 +69,23 @@ async function main(): Promise<number> {
   }
   const mission = missionen.get(job.fakt)!;
 
+  // Toolpacks aus der Konfig (keine Hardcodings): firmenbuch, künftig mehr.
+  const TOOLPACKS: Record<string, (c: typeof cfg) => ((pi: any) => void)[]> = {
+    firmenbuch: firmenbuchToolpack,
+  };
+  const toolpackFactories = cfg.toolpacks.flatMap((name) => TOOLPACKS[name]?.(cfg) ?? []);
+  if (toolpackFactories.length === 0 && cfg.toolpacks.length > 0) {
+    emit({ t: "error", code: "toolpacks_unavailable", wanted: cfg.toolpacks });
+    return 1;
+  }
+  const extensionFactories = [statusTool, kontextTools(cfg), schreibenTool(cfg, VERSION), ...toolpackFactories];
+
   const loader = new DefaultResourceLoader({
     cwd: process.cwd(),
     agentDir: getAgentDir(),
     systemPromptOverride: () => mission.systemPrompt,
     appendSystemPromptOverride: () => [],
-    // Toolpacks aus der Konfig (keine Hardcodings): firmenbuch, künftig mehr.
-    const toolpackFactories = cfg.toolpacks.flatMap((name) => {
-      try {
-        // dynamischer Import wäre async — wir mappen synchron über ein Registry-Objekt
-        const packs: Record<string, (c: typeof cfg) => ((pi: any) => void)[]> = {
-          firmenbuch: (c) => require("./toolpacks/firmenbuch.js").firmenbuchToolpack(c),
-        };
-        return packs[name]?.(cfg) ?? [];
-      } catch {
-        return []; // unbekanntes Pack: leer — Fail-loud über Log unten
-      }
-    });
-    if (toolpackFactories.length === 0 && cfg.toolpacks.length > 0) {
-      emit({ t: "error", code: "toolpacks_unavailable", wanted: cfg.toolpacks });
-      return 1;
-    }
-    const extensionFactories = [statusTool, kontextTools(cfg), schreibenTool(cfg, VERSION), ...toolpackFactories];
+    extensionFactories,
   });
   await loader.reload();
 
