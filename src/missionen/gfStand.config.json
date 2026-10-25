@@ -1,0 +1,16 @@
+{
+  "$comment": "Mission gf_stand — DATEN, kein Code (Blaupause §2: neue Mission = neue *.config.json + *.prompt.md, keine Harness-Änderung). userPrompt-Platzhalter: {project} {bidder} {fn} {stichtag}.",
+  "fakt": "gf_stand",
+  "name": "GF-Stand (vertretungsbefugte Personen zum Stichtag)",
+  "promptFile": "gfStand.prompt.md",
+  "userPrompt": "Job: Mission gf_stand für Bieter \"{bidder}\" in Projekt \"{project}\". {fn_hinweis} {stichtag_hinweis} Beginne jetzt mit Schritt 1.",
+  "fnHinweis": "FN bekannt: {fn}.",
+  "fnHinweisFehlend": "FN unbekannt — über die Kontext-Tools ermitteln.",
+  "stichtagHinweis": "Stichtag: {stichtag}.",
+  "stichtagHinweisFehlend": "Stichtag: über projekt_lesen ermitteln.",
+  "bericht": {
+    "required": ["stichtag", "vertretungsbefugte", "quelle"],
+    "fnNullable": true
+  },
+  "schreiben": { "fakt": "gf_stand", "enabled": true }
+}

@@ -8,11 +8,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
 
-export const FAKT_WRITE_URL =
-  process.env.FB_PI_FAKT_URL ?? "http://127.0.0.1:5555/fakt/write";
+import type { FbPiKonfig } from "../konfig.js";
 
-export async function faktWrite(body: unknown, token: string): Promise<Record<string, unknown>> {
-  const res = await fetch(FAKT_WRITE_URL, {
+export async function faktWrite(url: string, body: unknown, token: string): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -25,7 +24,9 @@ export async function faktWrite(body: unknown, token: string): Promise<Record<st
   return data;
 }
 
-export function schreibenTool(pi: ExtensionAPI): void {
+export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionAPI) => void {
+  const URL_ = cfg.tools.schreiben.faktUrl;
+  return (pi: ExtensionAPI): void => {
   pi.registerTool({
     name: "audit_meta_schreiben",
     label: "Fakt schreiben",
@@ -65,12 +66,13 @@ export function schreibenTool(pi: ExtensionAPI): void {
         };
       }
       const job = (globalThis as any).__fbpi_job_id ?? "adhoc";
+        const fakt = "gf_stand"; // Missions-spezifisch — Tool-Contract bleibt gf_stand in v1
       try {
-        const out = await faktWrite(
+        const out = await faktWrite(URL_,
           {
             project: params.project,
             bidder: params.bidder,
-            fakt: "gf_stand",
+            fakt,
             payload: params.payload,
             provenance: { agent: "fb-pi@0.1.0", job_id: String(job), quelle: params.payload.quelle },
           },
@@ -85,3 +87,4 @@ export function schreibenTool(pi: ExtensionAPI): void {
     },
   });
 }
+};

@@ -1,6 +1,6 @@
-/** fb-pi CLI — Job-JSON → pi-Session (inMemory) → Mission → Bericht.
- * Phase 0 (Plan §6): --selftest beweist Session + Edge-Provider + 1 Tool-Call
- * im stdout-JSONL-Protokoll; --job ist der spätere robotni-Einstieg. */
+/** fb-pi CLI — Job-JSON → pi-Session (inMemory) → Mission (datengetrieben) → Bericht.
+ * Alles Betriebsparameter kommt aus src/konfig.ts (ENV > fb-pi.config.json > Defaults).
+ * Missionen: registry lädt missionen/*.config.json — neue Mission ohne Codeänderung. */
 
 import {
   createAgentSession,
@@ -10,14 +10,15 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { emit } from "./protokoll.js";
-import { MODEL_ID, PROVIDER_ID, registerEdgeProvider, resolveGatewayToken } from "./provider.js";
+import { edgeProviderConfig, resolveGatewayToken } from "./provider.js";
 import { firmenindexTools } from "./tools/firmenindex.js";
 import { kontextTools } from "./tools/kontext.js";
 import { statusTool } from "./tools/status.js";
 import { schreibenTool } from "./tools/schreiben.js";
-import { gfStandSystemPrompt, gfStandUserPrompt, isGfStandJob } from "./missionen/gfStand.js";
+import { ladeKonfig } from "./konfig.js";
+import { isMissionJob, ladeMissionen } from "./missionen/registry.js";
 
-const VERSION = "0.0.1";
+const VERSION = "0.2.0";
 
 function parseArgs(argv: string[]): { selftest: boolean; jobJson: string | null } {
   const selftest = argv.includes("--selftest");
@@ -34,34 +35,46 @@ async function main(): Promise<number> {
     return 2;
   }
 
+  const cfg = ladeKonfig();
+  const missionen = ladeMissionen(cfg.missionen.dir);
+
   // Gateway-Token VOR Session-Erzeugung resolven (Provider liest $ENV beim Call)
-  const token = resolveGatewayToken();
-  process.env.UNIINFER_GATEWAY_TOKEN = token;
+  const token = resolveGatewayToken(cfg.provider.tokenEnv, cfg.provider.tokenCommand);
+  process.env[cfg.provider.tokenEnv] = token;
+
+  const job = selftest
+    ? { project: "arbeitsschuhe-selftest", bidder: "Georg Traugott GmbH", fakt: "gf_stand" }
+    : JSON.parse(jobJson!);
+  if (!isMissionJob(job) || !missionen.has(job.fakt)) {
+    emit({ t: "error", code: "unknown_mission_or_job", fakt: (job as any)?.fakt, verfuegbar: [...missionen.keys()] });
+    return 2;
+  }
+  const mission = missionen.get(job.fakt)!;
 
   const loader = new DefaultResourceLoader({
     cwd: process.cwd(),
     agentDir: getAgentDir(),
-    systemPromptOverride: () => gfStandSystemPrompt(),
+    systemPromptOverride: () => mission.systemPrompt,
     appendSystemPromptOverride: () => [],
-    extensionFactories: [statusTool, firmenindexTools, kontextTools, schreibenTool],
+    extensionFactories: [statusTool, firmenindexTools(cfg), kontextTools(cfg), schreibenTool(cfg, VERSION)],
   });
   await loader.reload();
 
   const modelRuntime = await ModelRuntime.create();
-  registerEdgeProvider(modelRuntime);
-  const model = modelRuntime.getModel(PROVIDER_ID, MODEL_ID);
+  modelRuntime.registerProvider(cfg.provider.id, edgeProviderConfig(cfg));
+  const model = modelRuntime.getModel(cfg.provider.id, cfg.provider.model);
   if (!model) {
-    emit({ t: "error", code: "model_not_registered", provider: PROVIDER_ID, model: MODEL_ID });
-    return 1; // Plan §5: harter Fehler, kein stiller Fallback
+    emit({ t: "error", code: "model_not_registered", provider: cfg.provider.id, model: cfg.provider.model });
+    return 1; // harter Fehler, kein stiller Fallback
   }
 
   const { session } = await createAgentSession({
     resourceLoader: loader,
     modelRuntime,
     model,
-    thinkingLevel: "off", // Fakt-Extraktion, kein Reasoning-Bedarf (Phase 0)
-    noTools: "builtin", // Built-ins aus — Extension-Tools (status_melden, firmenindex_suche) bleiben
-    sessionManager: SessionManager.inMemory(), // One-shot: kein Session-Gedächtnis
+    thinkingLevel: cfg.provider.thinking,
+    noTools: "builtin", // Built-ins aus — Extension-Tools bleiben (nicht "all"!)
+    sessionManager: SessionManager.inMemory(),
   });
 
   const t0 = Date.now();
@@ -72,48 +85,46 @@ async function main(): Promise<number> {
     }
   });
 
-  const job = selftest
-    ? { project: "arbeitsschuhe-selftest", bidder: "Georg Traugott GmbH", fakt: "gf_stand" as const }
-    : JSON.parse(jobJson!);
-  if (!isGfStandJob(job)) {
-    emit({ t: "error", code: "invalid_job", job });
-    return 2;
-  }
-
   (globalThis as any).__fbpi_job_id = `${job.project}@${job.bidder}@${Date.now()}`;
   emit({
     t: "job_start",
     agent: `fb-pi@${VERSION}`,
     mission: job.fakt,
+    mission_name: mission.name,
     job,
-    model: { provider: PROVIDER_ID, id: MODEL_ID, thinking: "off", baseUrl: "uniinfer.skale.dev/v1" },
-    phase: 0,
+    model: {
+      provider: cfg.provider.id,
+      id: cfg.provider.model,
+      thinking: cfg.provider.thinking,
+      baseUrl: cfg.provider.baseUrl.replace(/^https?:\/\//, "").split("/")[0],
+    },
+    schreiben: mission.schreiben.enabled,
   });
 
   try {
-    await session.prompt(gfStandUserPrompt(job));
+    await session.prompt(mission.userPrompt(job));
     const antwort = session.getLastAssistantText();
     emit({ t: "bericht", text: antwort });
-    // Bericht-Validierung (Phase-2-Notiz aus Phase 1: ein Lauf hatte malformed
-    // JSON) — fenced JSON extrahieren, Minimal-Schema prüfen, LAUT im Protokoll.
+    // Bericht-Validierung gegen den MISSIONS-Vertrag (required aus Config)
     const fenced = antwort.match(/```json\s*([\s\S]*?)```/);
     const raw = fenced ? fenced[1] : antwort.slice(0, 20000);
     let bericht_ok = false;
     let bericht_fehler = "";
     try {
       const b = JSON.parse(raw.trim());
+      const fehlt = mission.bericht.required.filter((k) => !(k in b));
       bericht_ok =
-        typeof b.stichtag === "string" &&
-        Array.isArray(b.vertretungsbefugte) &&
-        typeof b.quelle === "string" &&
-        (b.fn === null || typeof b.fn === "string");
+        fehlt.length === 0 &&
+        (mission.bericht.fnNullable ? true : typeof b.fn === "string") &&
+        Array.isArray(b.vertretungsbefugte) === true;
+      if (!bericht_ok) bericht_fehler = fehlt.length ? `fehlend: ${fehlt.join(",")}` : "typfehler";
     } catch (e) {
       bericht_fehler = String(e).slice(0, 120);
     }
     emit({ t: "bericht_valid", ok: bericht_ok, fehler: bericht_fehler || undefined });
-    emit({ t: "usage", ...( (usage as object) ?? {}) });
-    emit({ t: "job_end", ok: true, elapsed_s: Number(((Date.now() - t0) / 1000).toFixed(1)) });
-    return 0;
+    emit({ t: "usage", ...((usage as object) ?? {}) });
+    emit({ t: "job_end", ok: bericht_ok, elapsed_s: Number(((Date.now() - t0) / 1000).toFixed(1)) });
+    return bericht_ok ? 0 : 1; // invalid Bericht = fehlgeschlagener Lauf
   } catch (err) {
     emit({ t: "job_end", ok: false, error: String(err).slice(0, 300) });
     return 1;

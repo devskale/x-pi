@@ -8,7 +8,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
 
-export const OFS_BASE = process.env.FB_PI_OFS_BASE ?? "/home/pi/code/dufs/klark0";
+import type { FbPiKonfig } from "../konfig.js";
 
 function safe(part: string): string | null {
   if (!part || part.includes("..") || part.includes("/") || part.includes("\\")) return null;
@@ -23,7 +23,9 @@ function readJson(file: string): Record<string, unknown> | { error: string } {
   }
 }
 
-export function kontextTools(pi: ExtensionAPI): void {
+export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
+  const OFS_BASE = cfg.tools.kontext.ofsBase;
+  return (pi: ExtensionAPI): void => {
   pi.registerTool({
     name: "fn_ermitteln",
     label: "FN ermitteln (deterministisch)",
@@ -115,7 +117,6 @@ export function kontextTools(pi: ExtensionAPI): void {
       return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
     },
   });
-}
 
 // ── fn_ermitteln: deterministische FN-Auflösung (Issue fb-pi-bauen Härtung) ──
 // Vorfall (Phase-1-Lauf 25.10.): das Modell „wusste" die FN (Trainingswissen)
@@ -173,4 +174,6 @@ export function fnErmitteln(
 
 function readDirSorted(dir: string): string[] {
   return existsSync(dir) ? readdirSync(dir).sort() : [];
+}
+  };
 }

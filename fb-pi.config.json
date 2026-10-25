@@ -1,0 +1,19 @@
+{
+  "$comment": "fb-pi Betriebsparameter — ENV überschreibt (FB_PI_MODEL, FB_PI_PROVIDER_URL, FIRMENINDEX_API, FB_PI_OFS_BASE, FB_PI_FAKT_URL, FB_PI_MISSIONEN_DIR; Token: UNIINFER_GATEWAY_TOKEN / FB_PI_FAKT_WRITE_TOKEN). Verträge (Schemas, Whitelists) sind Code, nicht Konfig.",
+  "provider": {
+    "id": "uniinfer-edge",
+    "model": "hab@qwen3.6-35b",
+    "baseUrl": "https://uniinfer.skale.dev/v1",
+    "contextWindow": 131072,
+    "maxTokens": 32768,
+    "thinking": "off",
+    "tokenEnv": "UNIINFER_GATEWAY_TOKEN",
+    "tokenCommand": ["credgoo", "uniinfer"]
+  },
+  "tools": {
+    "firmenindex": { "apiUrl": "https://skale.dev/firmenindex/api" },
+    "kontext": { "ofsBase": "/home/pi/code/dufs/klark0" },
+    "schreiben": { "faktUrl": "http://127.0.0.1:5555/fakt/write" }
+  },
+  "missionen": { "dir": "missionen" }
+}

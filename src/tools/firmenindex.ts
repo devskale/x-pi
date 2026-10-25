@@ -12,11 +12,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
 
-export const FIRMENINDEX_API =
-  process.env.FIRMENINDEX_API ?? "https://skale.dev/firmenindex/api";
+import type { FbPiKonfig } from "../konfig.js";
 
-async function callFi(path: string, params: Record<string, string> = {}): Promise<unknown> {
-  const url = new URL(FIRMENINDEX_API);
+async function callFi(apiUrl: string, path: string, params: Record<string, string> = {}): Promise<unknown> {
+  const url = new URL(apiUrl);
   url.searchParams.set("e", path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
@@ -28,7 +27,9 @@ async function callFi(path: string, params: Record<string, string> = {}): Promis
   }
 }
 
-export function firmenindexTools(pi: ExtensionAPI): void {
+export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
+  const API = cfg.tools.firmenindex.apiUrl;
+  return (pi: ExtensionAPI): void => {
   pi.registerTool({
     name: "firmenindex_vertretung",
     label: "Firmenindex Vertretung",
@@ -45,7 +46,7 @@ export function firmenindexTools(pi: ExtensionAPI): void {
       emit({ t: "tool_call", name: "firmenindex_vertretung", params });
       let out: unknown;
       try {
-        out = await callFi(`firmen/${params.fn}/vertretung`, { stichtag: params.stichtag });
+        out = await callFi(API, `firmen/${params.fn}/vertretung`, { stichtag: params.stichtag });
         emit({ t: "tool_result", name: "firmenindex_vertretung", ok: !((out as any)?.error) });
       } catch (err) {
         out = { error: String(err).slice(0, 200) };
@@ -69,7 +70,7 @@ export function firmenindexTools(pi: ExtensionAPI): void {
       emit({ t: "tool_call", name: "firmenindex_suche", params });
       let out: unknown;
       try {
-        const raw = (await callFi("suche", { q: params.query })) as Record<string, unknown>;
+        const raw = (await callFi(API, "suche", { q: params.query })) as Record<string, unknown>;
         if (raw?.error === "Forbidden") {
           out = { verfügbar: false, grund: "suche Token-gegate­d (Konto: Phase 3) — FN aus Kontext ermitteln" };
         } else {
@@ -83,3 +84,4 @@ export function firmenindexTools(pi: ExtensionAPI): void {
     },
   });
 }
+};
