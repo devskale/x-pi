@@ -1,6 +1,6 @@
 {
   "name": "fb-pi",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Firmenbuch-Fakt-Agent auf pi-SDK-Basis — Mission gf_stand (Issue fb-pi-bauen, docs/fb-pi-plan-2026-10-25.md)",

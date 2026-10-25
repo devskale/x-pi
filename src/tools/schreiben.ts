@@ -74,7 +74,7 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
             bidder: params.bidder,
             fakt,
             payload: params.payload,
-            provenance: { agent: "fb-pi@0.1.0", job_id: String(job), quelle: params.payload.quelle },
+            provenance: { agent: `fb-pi@${version}`, job_id: String(job), quelle: params.payload.quelle },
           },
           token,
         );

@@ -105,9 +105,28 @@ async function main(): Promise<number> {
     await session.prompt(mission.userPrompt(job));
     const antwort = session.getLastAssistantText();
     emit({ t: "bericht", text: antwort });
-    // Bericht-Validierung gegen den MISSIONS-Vertrag (required aus Config)
-    const fenced = antwort.match(/```json\s*([\s\S]*?)```/);
-    const raw = fenced ? fenced[1] : antwort.slice(0, 20000);
+    // Bericht-Validierung gegen den MISSIONS-Vertrag (required aus Config).
+    // Extraktion dreistufig: fenced ```json``` → größtes balanciertes JSON im
+    // Text (Modelle schreiben gern Prosa drumherum) → Ganzer Text.
+    const extractJson = (txt: string): string | null => {
+      const fenced = txt.match(/```json\s*([\s\S]*?)```/);
+      if (fenced) return fenced[1]!;
+      let best: string | null = null;
+      for (let i = txt.indexOf("{"); i !== -1; i = txt.indexOf("{", i + 1)) {
+        let tiefe = 0, inStr = false, esc = false;
+        for (let j = i; j < txt.length; j++) {
+          const c = txt[j]!;
+          if (esc) { esc = false; continue; }
+          if (c === "\\") { esc = true; continue; }
+          if (c === '"') inStr = !inStr;
+          if (inStr) continue;
+          if (c === "{") tiefe++;
+          else if (c === "}") { tiefe--; if (tiefe === 0) { const k = txt.slice(i, j + 1); if (!best || k.length > best.length) best = k; break; } }
+        }
+      }
+      return best;
+    };
+    const raw = extractJson(antwort) ?? antwort.slice(0, 20000);
     let bericht_ok = false;
     let bericht_fehler = "";
     try {

@@ -42,7 +42,7 @@ export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
       emit({ t: "tool_call", name: "fn_ermitteln", params });
       const p = safe(params.project);
       const b = safe(params.bidder);
-      const out = p && b ? fnErmitteln(p, b, undefined) : { fn: null, quelle: "ungültige Namen" };
+      const out = p && b ? fnErmitteln(p, b, undefined, OFS_BASE) : { fn: null, quelle: "ungültige Namen" };
       emit({ t: "tool_result", name: "fn_ermitteln", ok: out.fn !== null, fn: out.fn, quelle: out.quelle });
       return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
     },
@@ -117,6 +117,8 @@ export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
       return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
     },
   });
+  };
+}
 
 // ── fn_ermitteln: deterministische FN-Auflösung (Issue fb-pi-bauen Härtung) ──
 // Vorfall (Phase-1-Lauf 25.10.): das Modell „wusste" die FN (Trainingswissen)
@@ -137,7 +139,7 @@ export function fnErmitteln(
   project: string,
   bidder: string,
   jobFn: string | undefined,
-  base: string = OFS_BASE,
+  base: string,
 ): FnFund {
   if (jobFn && /^[0-9]{4,6}[a-z]$/.test(jobFn)) return { fn: jobFn, quelle: "job" };
   const kandidaten: { fn: string; quelle: string }[] = [];
@@ -174,6 +176,4 @@ export function fnErmitteln(
 
 function readDirSorted(dir: string): string[] {
   return existsSync(dir) ? readdirSync(dir).sort() : [];
-}
-  };
 }

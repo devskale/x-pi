@@ -36,7 +36,7 @@ test("ENV schlägt Datei schlägt Defaults", () => {
 });
 
 test("Missionen-Registry: gf_stand als Datendatei ladbar", () => {
-  const m = ladeMissionen("src/missionen");
+  const m = ladeMissionen("missionen");
   assert.ok(m.has("gf_stand"), `gf_stand in Registry (verfügbar: ${[...m.keys()]})`);
   const gf = m.get("gf_stand")!;
   assert.match(gf.systemPrompt, /vertretungsbefugte/);
