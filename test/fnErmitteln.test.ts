@@ -56,3 +56,32 @@ test("nichts gefunden → fn null + hinweis (nie raten)", () => {
 });
 
 test.after(() => rmSync(BASE, { recursive: true, force: true }));
+
+// Validierungsfund 26.10.: meta.fn mit Leerzeichen ("FN 274413 z")
+import { test } from "node:test";
+import { mkdirSync } from "node:fs";
+import assert from "node:assert/strict";
+import { fnErmitteln } from "../src/toolpacks/firmenbuch.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+test("fn_ermitteln: FN 274413 z (Leerzeichen) wird normalisiert erkannt", () => {
+  const base = mkdtempSync(join(tmpdir(), "fntest-"));
+  const bDir = join(base, "P", "B", "X GmbH");
+  mkdirSync(bDir, { recursive: true });
+  writeFileSync(join(bDir, "audit.json"), JSON.stringify({ meta: { fn: "FN 274413 z" } }));
+  const r = fnErmitteln("P", "X GmbH", undefined, base);
+  assert.equal(r.fn, "274413z");
+  rmSync(base, { recursive: true, force: true });
+});
+
+test("fn_ermitteln: klassische Form bleibt", () => {
+  const base = mkdtempSync(join(tmpdir(), "fntest2-"));
+  const bDir = join(base, "P", "B", "Y GmbH");
+  mkdirSync(bDir, { recursive: true });
+  writeFileSync(join(bDir, "audit.json"), JSON.stringify({ meta: { fn: "188942g" } }));
+  const r = fnErmitteln("P", "Y GmbH", undefined, base);
+  assert.equal(r.fn, "188942g");
+  rmSync(base, { recursive: true, force: true });
+});

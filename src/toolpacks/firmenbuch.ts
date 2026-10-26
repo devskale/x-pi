@@ -159,8 +159,8 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
             hinweis: `FN ${params.fn} nicht unter Namen ${JSON.stringify(params.erwarteter_name)} — Namen prüfen oder FN über andere Quelle`,
             gefundene_fns: (raw?.results ?? []).slice(0, 3).map((r: any) => r.fn),
           };
-        } else if (treffer.name === params.erwarteter_name) {
-          out = { status: "konsistent_direkt", name_heute: treffer.name, fruehere_namen: treffer.former_names ?? [] };
+        } else if (namenGleich(treffer.name, params.erwarteter_name)) {
+          out = { status: "konsistent_direkt", name_heute: treffer.name, fruehere_namen: treffer.former_names ?? [], hinweis: treffer.name === params.erwarteter_name ? undefined : "identisch bis auf Schreibweise/Punktuation" };
         } else if (Array.isArray(treffer.former_names) && treffer.former_names.includes(params.erwarteter_name)) {
           out = {
             status: "konsistent_umbenannt",
@@ -196,7 +196,16 @@ export interface FnFund {
   hinweis?: string;
 }
 
-const FN_RE = /\b(\d{4,6}[a-z])\b/g;
+// Validierungsfund 26.10.: meta.fn-Werte sind teils "FN 274413 z" (Leerzeichen
+// vor dem Buchstaben) — der strenge Regex matchte nicht, FN galt als unbelegt.
+const FN_RE = /\b(\d{4,6})\s*([a-z])\b/g;
+
+// Schreibkonventions-Toleranz: "m.b.H" ≡ "m.b.H." (Validierungsfund 26.10.:
+// Register trägt den Schlusspunkt, Ordner nicht — keine echte Diskrepanz).
+function namenGleich(a: string, b: string): boolean {
+  const norm = (x: string) => x.toLowerCase().replace(/[\s.,&/-]+/g, "");
+  return norm(a) === norm(b) && norm(a).length > 0;
+}
 
 export function fnErmitteln(
   project: string,
@@ -210,8 +219,9 @@ export function fnErmitteln(
   try {
     const audit = JSON.parse(readFileSync(path.join(bDir, "audit.json"), "utf8"));
     const meta = audit.meta;
-    if (meta && typeof meta.fn === "string" && /^[0-9]{4,6}[a-z]$/.test(meta.fn)) {
-      kandidaten.push({ fn: meta.fn, quelle: "audit_meta.fn" });
+    if (meta && typeof meta.fn === "string") {
+      const fm = meta.fn.match(FN_RE)?.[0]?.replace(/\s+/g, "") ?? "";
+      if (fm) kandidaten.push({ fn: fm, quelle: "audit_meta.fn" });
     }
   } catch { /* kein audit.json */ }
   try {
@@ -221,9 +231,10 @@ export function fnErmitteln(
       if (!f.endsWith(".meta.json") || f.includes(".backup")) continue;
       const sc = JSON.parse(readFileSync(path.join(bDir, f), "utf8"));
       const hay = JSON.stringify(sc);
-      const m = hay.match(FN_RE);
-      if (m && !kandidaten.some((k) => k.fn === m[0])) {
-        kandidaten.push({ fn: m[0], quelle: `sidecar:${f.replace(/\.meta\.json$/, "")}` });
+      const m = hay.match(FN_RE); // /g-Flag: Liste von Match-Strings (keine Gruppen)
+      const fn_norm = m && m[0] ? m[0].replace(/\s+/g, "") : null;
+      if (fn_norm && !kandidaten.some((k) => k.fn === fn_norm)) {
+        kandidaten.push({ fn: fn_norm, quelle: `sidecar:${f.replace(/\.meta\.json$/, "")}` });
       }
     }
   } catch { /* dir nicht lesbar */ }
