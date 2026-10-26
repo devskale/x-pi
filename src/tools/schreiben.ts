@@ -40,22 +40,8 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
     parameters: Type.Object({
       project: Type.String(),
       bidder: Type.String(),
-      payload: Type.Object({
-        fn: Type.Union([Type.String(), Type.Null()]),
-        fn_quelle: Type.Optional(Type.String()),
-        stichtag: Type.String(),
-        quelle: Type.String(),
-        vertretungsbefugte: Type.Array(
-          Type.Object({
-            name: Type.String(),
-            funktion: Type.Optional(Type.String()),
-            seit: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-            bis: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-            befugnis: Type.Optional(Type.String()),
-          }),
-        ),
-        unsicherheiten: Type.Optional(Type.Array(Type.String())),
-      }),
+      fakt: Type.Optional(Type.String({ description: "gf_stand (Default) | preise_check" })),
+      payload: Type.Record(Type.String(), Type.Unknown()),
     }),
     execute: async (_id, params) => {
       emit({ t: "tool_call", name: "audit_meta_schreiben", params: { project: params.project, bidder: params.bidder } });
@@ -68,7 +54,7 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
         };
       }
       const job = (globalThis as any).__fbpi_job_id ?? "adhoc";
-        const fakt = "gf_stand"; // Missions-spezifisch — Tool-Contract bleibt gf_stand in v1
+        const fakt = params.fakt ?? "gf_stand"; // Mission-spezifisch, Server validiert Whitelist hart
       try {
         // Read-back (Blaupause §6, SOTA self-verification): nach dem Write
         // den Fakt aus dem Bestand lesen und fn/stichtag/anzahl vergleichen —
@@ -88,17 +74,28 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
           const audit = JSON.parse(readFileSync(
             path.join(cfg.tools.kontext.ofsBase, params.project, "B", params.bidder, "audit.json"), "utf8"));
           const steht = ((audit as any).meta ?? {})[fakt] ?? null;
-          const p = params.payload;
-          read_back = {
-            ok: !!steht
-              && steht.fn === p.fn
-              && steht.stichtag === p.stichtag
-              && Array.isArray(steht.vertretungsbefugte)
-              && steht.vertretungsbefugte.length === p.vertretungsbefugte.length,
-            fn: steht?.fn ?? null,
-            stichtag: steht?.stichtag ?? null,
-            n_vertretungsbefugte: Array.isArray(steht?.vertretungsbefugte) ? steht.vertretungsbefugte.length : 0,
-          };
+          const p: any = params.payload;
+          if (fakt === "preise_check") {
+            read_back = {
+              ok: !!steht && steht.hand_summe === p.hand_summe && Array.isArray(steht.positionen)
+                && steht.positionen.length === (p.positionen?.length ?? 0),
+              hand_summe: steht?.hand_summe ?? null,
+              reader_summe: steht?.reader_summe ?? null,
+              ok_flag: steht?.ok ?? null,
+              n_positionen: Array.isArray(steht?.positionen) ? steht.positionen.length : 0,
+            };
+          } else {
+            read_back = {
+              ok: !!steht
+                && steht.fn === p.fn
+                && steht.stichtag === p.stichtag
+                && Array.isArray(steht.vertretungsbefugte)
+                && steht.vertretungsbefugte.length === p.vertretungsbefugte.length,
+              fn: steht?.fn ?? null,
+              stichtag: steht?.stichtag ?? null,
+              n_vertretungsbefugte: Array.isArray(steht?.vertretungsbefugte) ? steht.vertretungsbefugte.length : 0,
+            };
+          }
         } catch (e) {
           read_back = { ok: false, grund: String(e).slice(0, 120) };
         }

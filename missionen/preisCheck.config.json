@@ -1,0 +1,11 @@
+{
+  "$comment": "Mission preis_check — per-Bidder (KEIN Cross-Bidder-Read, User 26.10.): Preisblatt-Volltext lesen, Positionen extrahieren, SUMME deterministisch (summe_berechnen, Software), gegen meta.preise (Reader) legen, meta.preise_check schreiben. Server rechnet die Summe nach.",
+  "fakt": "preise_check",
+  "name": "Preis-Check (Positionen extrahieren, deterministisch summieren, Reader abgleichen)",
+  "promptFile": "preisCheck.prompt.md",
+  "userPrompt": "Job: Mission preis_check für Bieter \"{bidder}\" in Projekt \"{project}\". Beginne jetzt mit Schritt 1.",
+  "bericht": {
+    "required": ["datei", "positionen", "hand_summe", "reader_summe", "differenz", "ok", "quelle"]
+  },
+  "schreiben": { "fakt": "preise_check", "enabled": true }
+}

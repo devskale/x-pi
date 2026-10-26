@@ -7,6 +7,7 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
+import { safeExecute } from "../toolpacks/firmenbuch.js";
 
 import type { FbPiKonfig } from "../konfig.js";
 
@@ -26,6 +27,68 @@ function readJson(file: string): Record<string, unknown> | { error: string } {
 export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
   const OFS_BASE = cfg.tools.kontext.ofsBase;
   return (pi: ExtensionAPI): void => {
+  // ── Mission preis_check (26.10.): Volltext-Best-Read + deterministische Summe ──
+  pi.registerTool({
+    name: "dok_lesen",
+    label: "Dokument-Volltext (Best-Parser)",
+    description:
+      "Liest den Volltext eines Dokuments (PDF: bester .md-Zwilling in md/ — " +
+      "der LÄNGSTE nicht-leere, OCR-fähige Parser gewinnt; .md direkt). " +
+      "Für Tabellen/Preisblätter: Positionen und Preise WÖRTLICH übernehmen.",
+    parameters: Type.Object({
+      project: Type.String(),
+      bidder: Type.String(),
+      datei: Type.String({ description: "Dateiname inkl. Endung (z.B. Preisblatt _2_.pdf)" }),
+    }),
+    execute: async (_id, params) => safeExecute("dok_lesen", async () => {
+      emit({ t: "tool_call", name: "dok_lesen", params });
+      const p = safe(params.project);
+      const b = safe(params.bidder);
+      if (!p || !b) throw new Error("ungültige Namen");
+      const bDir = path.join(OFS_BASE, p, "B", b);
+      if (params.datei.endsWith(".md")) {
+        const t = readFileSync(path.join(bDir, params.datei), "utf8");
+        emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: t.length });
+        return { content: [{ type: "text", text: t.slice(0, 40000) }], details: {} };
+      }
+      const base = params.datei.replace(/\.[a-z0-9]+$/i, "");
+      const mdDir = path.join(bDir, "md");
+      let best = "";
+      if (existsSync(mdDir)) {
+        for (const f of readdirSync(mdDir)) {
+          if (!f.startsWith(base) || !f.endsWith(".md")) continue;
+          let t = "";
+          try { t = readFileSync(path.join(mdDir, f), "utf8"); } catch { continue; }
+          // YAML-Frontmatter strippen (Vorfall-Klasse: Parse-Stempel ist kein Inhalt)
+          t = t.replace(/^---\n[\s\S]*?\n---\n/, "");
+          if (t.trim().length > best.trim().length) best = t;
+        }
+      }
+      if (!best.trim()) throw new Error("kein lesbarer .md-Zwilling für " + params.datei);
+      emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: best.length });
+      return { content: [{ type: "text", text: best.slice(0, 40000) }], details: {} };
+    }),
+  });
+
+  pi.registerTool({
+    name: "summe_berechnen",
+    label: "Summe (deterministisch)",
+    description:
+      "Summiert Zahlen DETERMINISTISCH (Software, kein LLM). Pflicht für " +
+      "Preis-Adjudizierungsdaten: der Agent extrahiert Positionspreise als " +
+      "Zahlen (DE-Format 1.234,56 → 1234.56), DIESE Summe ist verbindlich.",
+    parameters: Type.Object({
+      zahlen: Type.Array(Type.Number()),
+    }),
+    execute: async (_id, params) => safeExecute("summe_berechnen", async () => {
+      emit({ t: "tool_call", name: "summe_berechnen", params: { n: params.zahlen.length } });
+      const summe = params.zahlen.reduce((a, x) => a + x, 0);
+      const out = { summe: Math.round(summe * 100) / 100, anzahl: params.zahlen.length };
+      emit({ t: "tool_result", name: "summe_berechnen", ok: true, ...out });
+      return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+    }),
+  });
+
   pi.registerTool({
     name: "fn_ermitteln",
     label: "FN ermitteln (deterministisch)",

@@ -13,7 +13,7 @@ import { emit } from "../protokoll.js";
 /** FUND 2 (x-pi-zuverlaessigkeit): garantiert tool_result für JEDEX Tool —
  * auch bei Exception. Ohne dies war ein transienter Tool-Fehler unsichtbar
  * (Agent narruerte „Tool fehlt", kein tool_result-Event, keine Diagnose). */
-async function safeExecute(
+export async function safeExecute(
   name: string,
   fn: (id: string, params: any) => Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>,
   id: string,
