@@ -132,6 +132,42 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
     },
   });
 
+  // gisa_abrufen (27.10., Mission gisaStand): GISA-Gewerbeberechtigungen mit
+  // dreiwertigem count-Vertrag (firmenindex d59bea4). FI_AGENT_TOKEN nötig —
+  // ohne Token LAUTER Fehler (nie still ohne Register-Daten antworten).
+  pi.registerTool({
+    name: "gisa_abrufen",
+    label: "GISA-Gewerbeberechtigungen (Register)",
+    description:
+      "GISA-Registerabgleich: Gewerbeberechtigungen einer FN (dreiwertig: " +
+      "count -1 = Abgleich läuft → optional live=true treibt ihn an; " +
+      "0 + amtlich_leer = amtlich kein Eintrag (GÜLTIGES Ergebnis); " +
+      ">=1 = vollständig mit gisazahl/wortlaut/seit/ruhend). Liefert " +
+      "{fn, count, amtlich_leer, vollstaendig, erhoben_am, negativ_cache_bis, " +
+      "gewerbe[]}. RUHEND 1:1 übernehmen, nichts werten.",
+    parameters: Type.Object({
+      fn: Type.String({ description: "Firmenbuchnummer, z.B. 127011g" }),
+      live: Type.Optional(Type.Boolean({ description: "true = Abgleich anstoßen (bei count -1; einmalig)" })),
+    }),
+    execute: async (_id, params) => safeExecute("gisa_abrufen", async () => {
+      emit({ t: "tool_call", name: "gisa_abrufen", params });
+      if (!TOKEN) {
+        return { content: [{ type: "text", text: "FEHLER: FI_AGENT_TOKEN nicht gesetzt — Registerabfrage verweigert" }], details: {} };
+      }
+      const out = (await callFi(
+        API,
+        `gisa/${params.fn}`,
+        params.live ? { live: "1" } : {},
+        TOKEN,
+        throttle,
+      )) as any;
+      const count = out?.count;
+      const ok = typeof count === "number" && count >= 0;
+      emit({ t: "tool_result", name: "gisa_abrufen", ok, count });
+      return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+    }),
+  });
+
   // B2 (Blaupause Lücke 4): Namens-Diskrepanzen DETERMINISTISCH auflösen statt
   // Prompt-Hoffnung — Vorfall KONSTANT/HoRa 25.10.: firmenindex-Name ≠ Bieter-
   // Name, Auflösung über former_names (Umbenennung), nie still mismen.

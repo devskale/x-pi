@@ -1,0 +1,14 @@
+{
+  "$comment": "Mission gisaStand — GISA-Registerabgleich als meta-Fakt (User-Architektur 27.10.: die GISA-Daten gehören in audit.json METADATEN, der PA liest sie von dort; das Live-Tool bleibt Fallback). Dreiwertiger count-Vertrag (firmenindex d59bea4): -1=Abgleich läuft → live=1 oder warten · 0+amtlich_leer=amtlich kein Eintrag · ≥1=vollständig. FN aus meta.gf_stand.fn (fn_ermitteln-Kette). Token: FI_AGENT_TOKEN (Agent-Topf, 120 req/min).",
+  "fakt": "gisa_stand",
+  "name": "GISA-Stand (Gewerbeberechtigungen aus dem Register)",
+  "promptFile": "gisaStand.prompt.md",
+  "userPrompt": "Job: Mission gisa_stand für Bieter \"{bidder}\" in Projekt \"{project}\". {fn_hinweis} Beginne jetzt mit Schritt 1.",
+  "fnHinweis": "FN bekannt: {fn} (aus meta.gf_stand).",
+  "fnHinweisFehlend": "FN unbekannt — über fn_ermitteln ermitteln (Registerabfrage ohne FN nicht möglich; scheitert das, Bericht mit fn null).",
+  "bericht": {
+    "required": ["fn", "count", "gewerbe", "quelle"],
+    "fnNullable": true
+  },
+  "schreiben": { "fakt": "gisa_stand", "enabled": true }
+}
