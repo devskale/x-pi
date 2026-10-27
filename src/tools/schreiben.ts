@@ -40,7 +40,7 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
     parameters: Type.Object({
       project: Type.String(),
       bidder: Type.String(),
-      fakt: Type.Optional(Type.String({ description: "gf_stand (Default) | preise_check" })),
+      fakt: Type.Optional(Type.String({ description: "gf_stand (Default) | preise_check | sammeldok_index" })),
       payload: Type.Record(Type.String(), Type.Unknown()),
     }),
     execute: async (_id, params) => {
@@ -75,7 +75,14 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
             path.join(cfg.tools.kontext.ofsBase, params.project, "B", params.bidder, "audit.json"), "utf8"));
           const steht = ((audit as any).meta ?? {})[fakt] ?? null;
           const p: any = params.payload;
-          if (fakt === "preise_check") {
+          if (fakt === "sammeldok_index") {
+            read_back = {
+              ok: !!steht && steht.dokument === p.dokument && Array.isArray(steht.teildokumente)
+                && steht.teildokumente.length === (p.teildokumente?.length ?? 0),
+              dokument: steht?.dokument ?? null,
+              n_teildokumente: Array.isArray(steht?.teildokumente) ? steht.teildokumente.length : 0,
+            };
+          } else if (fakt === "preise_check") {
             read_back = {
               ok: !!steht && steht.hand_summe === p.hand_summe && Array.isArray(steht.positionen)
                 && steht.positionen.length === (p.positionen?.length ?? 0),

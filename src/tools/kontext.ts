@@ -34,11 +34,16 @@ export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
     description:
       "Liest den Volltext eines Dokuments (PDF: bester .md-Zwilling in md/ — " +
       "der LÄNGSTE nicht-leere, OCR-fähige Parser gewinnt; .md direkt). " +
-      "Für Tabellen/Preisblätter: Positionen und Preise WÖRTLICH übernehmen.",
+      "Für Tabellen/Preisblätter: Positionen und Preise WÖRTLICH übernehmen. " +
+      "Große Sammeldoks (>40k Zeichen): IMMER gepaged (seite_von/seite_bis; " +
+      "ohne Seitenmarker: zeichen_von-Fenster à 40k) — nie als Ein-Blob.",
     parameters: Type.Object({
       project: Type.String(),
       bidder: Type.String(),
       datei: Type.String({ description: "Dateiname inkl. Endung (z.B. Preisblatt _2_.pdf)" }),
+      seite_von: Type.Optional(Type.Number({ description: "Paging: erste Seite (inkl.), benötigt Seitenmarker" })),
+      seite_bis: Type.Optional(Type.Number({ description: "Paging: letzte Seite (inkl.)" })),
+      zeichen_von: Type.Optional(Type.Number({ description: "Paging-Fallback ohne Seitenmarker: Fenster ab Zeichen (40k-Fenster)" })),
     }),
     execute: async (_id, params) => safeExecute("dok_lesen", async () => {
       emit({ t: "tool_call", name: "dok_lesen", params });
@@ -65,8 +70,43 @@ export function kontextTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
         }
       }
       if (!best.trim()) throw new Error("kein lesbarer .md-Zwilling für " + params.datei);
-      emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: best.length });
-      return { content: [{ type: "text", text: best.slice(0, 40000) }], details: {} };
+      // ── Paging (Mission sammeldok_index, 27.10.): große Sammeldoks werden
+      // NIE als Ein-Blob gelesen — Seitenmarker `<!-- page N -->` schneiden
+      // saubere Fenster; ohne Marker dient zeichen_von als Fallback.
+      const PAGE = /<!-- page (\d+) -->/g;
+      const marks: { nr: number; idx: number }[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = PAGE.exec(best)) !== null) marks.push({ nr: Number(m[1]), idx: m.index });
+      const hatMarker = marks.length > 0;
+      const seitenGesamt = hatMarker ? marks[marks.length - 1].nr : 0;
+      const wantsPage = params.seite_von !== undefined || params.seite_bis !== undefined;
+      if (wantsPage && !hatMarker) {
+        throw new Error(`keine Seitenmarker in ${params.datei} — nutze zeichen_von-Fenster (zeichen_gesamt=${best.length})`);
+      }
+      if (wantsPage && hatMarker) {
+        const von = Math.max(1, params.seite_von ?? 1);
+        const bis = Math.min(seitenGesamt, params.seite_bis ?? von);
+        let text = "";
+        for (let i = 0; i < marks.length; i++) {
+          const { nr, idx } = marks[i];
+          if (nr > bis) break;
+          const end = i + 1 < marks.length ? marks[i + 1].idx : best.length;
+          if (nr >= von) text += best.slice(idx, end);
+        }
+        if (!text.trim()) throw new Error(`Seite ${von}–${bis} nicht gefunden (seiten_gesamt=${seitenGesamt})`);
+        const kopf = `📄 Seite ${von}–${bis} von ${seitenGesamt} · Zeichen ${text.length} · Gesamt ${best.length}\n\n`;
+        emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: text.length, seite: `${von}-${bis}`, seiten_gesamt: seitenGesamt });
+        return { content: [{ type: "text", text: kopf + text.slice(0, 60000) }], details: { seiten_gesamt: seitenGesamt, zeichen_gesamt: best.length, hat_seitenmarker: true, seite_von: von, seite_bis: bis } };
+      }
+      if (params.zeichen_von !== undefined) {
+        const von = Math.max(0, Math.floor(params.zeichen_von));
+        const fenster = best.slice(von, von + 40000);
+        const kopf = `📄 Zeichen ${von}–${von + fenster.length} von ${best.length}${hatMarker ? ` (Seitenmarker vorhanden — nutze seite_von/seite_bis)` : " (keine Seitenmarker)"}\n\n`;
+        emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: fenster.length, zeichen_von: von, hat_seitenmarker: hatMarker });
+        return { content: [{ type: "text", text: kopf + fenster }], details: { zeichen_gesamt: best.length, hat_seitenmarker: hatMarker, zeichen_von: von, seiten_gesamt: seitenGesamt } };
+      }
+      emit({ t: "tool_result", name: "dok_lesen", ok: true, zeichen: best.length, seiten_gesamt: seitenGesamt, hat_seitenmarker: hatMarker });
+      return { content: [{ type: "text", text: best.slice(0, 40000) }], details: { seiten_gesamt: seitenGesamt, zeichen_gesamt: best.length, hat_seitenmarker: hatMarker } };
     }),
   });
 

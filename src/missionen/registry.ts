@@ -9,7 +9,7 @@ export interface Mission {
   fakt: string;
   name: string;
   systemPrompt: string;
-  userPrompt(params: { project: string; bidder: string; fn?: string; stichtag?: string }): string;
+  userPrompt(params: { project: string; bidder: string; fn?: string; stichtag?: string; dokument?: string }): string;
   bericht: { required: string[]; fnNullable: boolean };
   schreiben: { fakt: string; enabled: boolean };
 }
@@ -19,6 +19,7 @@ export interface MissionJob {
   bidder: string;
   fn?: string;
   stichtag?: string;
+  dokument?: string;
   fakt: string;
 }
 
@@ -61,14 +62,17 @@ export function ladeMissionen(dir: string): Map<string, Mission> {
           bidder: p.bidder,
           fn: p.fn ?? "",
           stichtag: p.stichtag ?? "",
+          dokument: p.dokument ?? "",
           fn_hinweis: fill(String(cfgAny.fnHinweis ?? ""), { fn: p.fn ?? "" }),
           fn_hinweis_fehlend: String(cfgAny.fnHinweisFehlend ?? ""),
           stichtag_hinweis: fill(String(cfgAny.stichtagHinweis ?? ""), { stichtag: p.stichtag ?? "" }),
           stichtag_hinweis_fehlend: String(cfgAny.stichtagHinweisFehlend ?? ""),
+          dokument_hinweis: p.dokument ? `Dokument: ${p.dokument}.` : "Dokument: FEHLT — Job abbrechen (Mission braucht dokument).",
         };
         return fill(String(cfgAny.userPrompt ?? "Job {fakt} für {bidder} in {project}. Beginne jetzt."), vars)
           .replace("{fn_hinweis}", p.fn ? vars.fn_hinweis : vars.fn_hinweis_fehlend)
-          .replace("{stichtag_hinweis}", p.stichtag ? vars.stichtag_hinweis : vars.stichtag_hinweis_fehlend);
+          .replace("{stichtag_hinweis}", p.stichtag ? vars.stichtag_hinweis : vars.stichtag_hinweis_fehlend)
+          .replace("{dokument_hinweis}", vars.dokument_hinweis);
       },
       bericht: {
         required: Array.isArray(cfgAny.bericht?.required) ? cfgAny.bericht.required : [],

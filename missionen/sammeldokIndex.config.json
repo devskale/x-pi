@@ -1,0 +1,12 @@
+{
+  "$comment": "Mission sammeldok_index — Sammeldok-Zerlegung (LgU/GesamtPDF/Profil) in Teildok-Index mit Zitat-Pflicht. Der Server prüft JEDES Zitat gegen den Dok-Volltext (422 bei Abweichung) — erfundene Teildokumente kommen nicht in den Bestand. User-Regel 2026-10-27: Tabelle/Inhaltsverzeichnis ist nur EIN Teil der Wahrheit; die Teildokumente schlagen die Tabelle. userPrompt-Platzhalter: {project} {bidder} {dokument}.",
+  "fakt": "sammeldok_index",
+  "name": "Sammeldok-Index (Teildokumente zerlegen)",
+  "promptFile": "sammeldokIndex.prompt.md",
+  "userPrompt": "Job: Mission sammeldok_index für Bieter \"{bidder}\" in Projekt \"{project}\". {dokument_hinweis} Beginne jetzt mit Schritt 1.",
+  "bericht": {
+    "required": ["dokument", "seiten_gesamt", "teildokumente", "quelle"],
+    "fnNullable": true
+  },
+  "schreiben": { "fakt": "sammeldok_index", "enabled": true }
+}
