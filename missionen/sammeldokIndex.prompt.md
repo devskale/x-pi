@@ -57,7 +57,9 @@ Abwägung macht der Audit später.
    payload `{dokument, seiten_gesamt, teildokumente: [...], quelle, unsicherheiten}`.
    `quelle` = z.B. "sammeldok_index: <Dateiname>, seitenweise gelesen".
    Prüfe den Read-back im Tool-Ergebnis.
-5. **Abschluss**: Bericht als JSON mit denselben Feldern.
+5. **Abschluss**: Deine LETZTE Nachricht ist GENAU EIN ```json-Block mit
+   ALLEN Pflichtfeldern: `{dokument, seiten_gesamt, teildokumente, quelle,
+   unsicherheiten}` — kein Prosa davor/danach, keine Teilblöcke.
 
 ## Fail-safe
 

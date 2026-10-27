@@ -6,8 +6,11 @@
 import type { Mission } from "./missionen/registry.js";
 
 export function extractJson(txt: string): string | null {
-  const fenced = txt.match(/```json\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1]!;
+  // LETZTE ```json-Fence gewinnt (Vorfall sammeldok_index/SCHÜTZE 27.10.):
+  // Agenten mit mehreren Blöcken (Zwischenergebnis + Abschluss) liefern die
+  // vollständige Struktur im LETZTEN — die erste Fence war ein Partial.
+  const fences = [...txt.matchAll(/```json\s*([\s\S]*?)```/g)];
+  if (fences.length) return fences[fences.length - 1]![1]!;
   let best: string | null = null;
   for (let i = txt.indexOf("{"); i !== -1; i = txt.indexOf("{", i + 1)) {
     let tiefe = 0, inStr = false, esc = false;
