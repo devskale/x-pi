@@ -2,7 +2,7 @@
   "$comment": "x-pi Betriebsparameter — ENV überschreibt (FB_PI_MODEL, FB_PI_PROVIDER_URL, FIRMENINDEX_API, FB_PI_OFS_BASE, FB_PI_FAKT_URL, FB_PI_MISSIONEN_DIR; Token: UNIINFER_GATEWAY_TOKEN / FB_PI_FAKT_WRITE_TOKEN). Verträge (Schemas, Whitelists) sind Code, nicht Konfig. Toolpacks: firmenbuch (gf_stand-Mission); weitere = Datei in src/toolpacks/ + Eintrag hier.",
   "provider": {
     "id": "uniinfer-edge",
-    "model": "hab@qwen3.6-35b",
+    "model": "tu@qwen-3.8-27b",
     "baseUrl": "https://uniinfer.skale.dev/v1",
     "contextWindow": 131072,
     "maxTokens": 32768,

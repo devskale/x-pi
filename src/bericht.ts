@@ -40,7 +40,12 @@ export interface BerichtValidierung {
   bericht?: Record<string, unknown>;
 }
 
-export function validiereBericht(antwort: string, mission: Mission): BerichtValidierung {
+export function validiereBericht(antwort: string | undefined | null, mission: Mission): BerichtValidierung {
+  // Vorfall 2026-11-10: tote Provider-Route (hab 500) → getLastAssistantText()
+  // undefined → matchAll-Crash statt klarer Fehlermeldung. Fail-loud, nie crash.
+  if (typeof antwort !== "string" || !antwort.trim()) {
+    return { ok: false, fehler: "keine Antwort vom Modell (Provider/Route tot oder leer)" };
+  }
   const raw = extractJson(antwort) ?? antwort.slice(0, 20000);
   try {
     const b = JSON.parse(raw.trim()) as Record<string, unknown>;
