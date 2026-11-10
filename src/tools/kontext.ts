@@ -7,7 +7,7 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { emit } from "../protokoll.js";
-import { safeExecute } from "../toolpacks/firmenbuch.js";
+import { fnErmitteln, safeExecute } from "../toolpacks/firmenbuch.js";
 
 import type { FbPiKonfig } from "../konfig.js";
 

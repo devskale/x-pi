@@ -41,7 +41,7 @@ export function edgeProviderConfig(cfg: Pick<FbPiKonfig, "provider">) {
         id: cfg.provider.model,
         name: cfg.provider.model,
         reasoning: true,
-        input: ["text"] as const,
+        input: ["text"] as ("image" | "text")[],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: cfg.provider.contextWindow,
         maxTokens: cfg.provider.maxTokens,

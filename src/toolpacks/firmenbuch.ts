@@ -13,14 +13,15 @@ import { emit } from "../protokoll.js";
 /** FUND 2 (x-pi-zuverlaessigkeit): garantiert tool_result für JEDEX Tool —
  * auch bei Exception. Ohne dies war ein transienter Tool-Fehler unsichtbar
  * (Agent narruerte „Tool fehlt", kein tool_result-Event, keine Diagnose). */
+export type ToolTextResult = { content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> };
+
 export async function safeExecute(
   name: string,
-  fn: (id: string, params: any) => Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }>,
-  id: string,
-  params: any,
-): Promise<{ content: Array<{ type: string; text: string }>; details: Record<string, unknown> }> {
+  fn: (...args: any[]) => Promise<ToolTextResult>,
+  ...args: any[]
+): Promise<ToolTextResult> {
   try {
-    return await fn(id, params);
+    return await fn(...args);
   } catch (err) {
     emit({ t: "tool_result", name, ok: false, error: String(err).slice(0, 200) });
     return {
@@ -301,10 +302,10 @@ export function firmenbuchToolpack(cfg: FbPiKonfig): ((pi: ExtensionAPI) => void
           project: Type.String(),
           bidder: Type.String(),
         }),
-        execute: async (_id, params) => safeExecute("fn_ermitteln", async (_i, prm) => {
-          emit({ t: "tool_call", name: "fn_ermitteln", params: prm });
-          const p = prm.project?.includes("..") ? null : prm.project;
-          const b = prm.bidder?.includes("..") ? null : prm.bidder;
+        execute: async (_id, params) => safeExecute("fn_ermitteln", async () => {
+          emit({ t: "tool_call", name: "fn_ermitteln", params });
+          const p = params.project?.includes("..") ? null : params.project;
+          const b = params.bidder?.includes("..") ? null : params.bidder;
           const out = p && b ? fnErmitteln(p, b, undefined, cfg.tools.kontext.ofsBase) : { fn: null, quelle: "ungültige Namen" };
           emit({ t: "tool_result", name: "fn_ermitteln", ok: out.fn !== null, fn: out.fn, quelle: out.quelle });
           return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
