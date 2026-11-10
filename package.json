@@ -1,6 +1,6 @@
 {
   "name": "x-pi",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "type": "module",
   "description": "x-pi \u2014 generischer Fakt-/Methoden-Agent auf pi-SDK-Basis (One-shot, Missionen als Daten, Toolpacks). Erste Mission: gf_stand (Firmenbuch/firmenindex).",

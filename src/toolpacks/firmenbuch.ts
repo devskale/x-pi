@@ -137,6 +137,37 @@ export function firmenindexTools(cfg: FbPiKonfig): (pi: ExtensionAPI) => void {
   // dreiwertigem count-Vertrag (firmenindex d59bea4). FI_AGENT_TOKEN nötig —
   // ohne Token LAUTER Fehler (nie still ohne Register-Daten antworten).
   pi.registerTool({
+    name: "insolvenz_abrufen",
+    label: "Insolvenzverfahren (Firmenindex)",
+    description:
+      "Insolvenz-Sicht einer FN laut Firmenindex (Gegenwarts-Check): liefert " +
+      "{fn, proceedings[]}. Leeres proceedings = kein Verfahren verzeichnet " +
+      "(beruhigende Bestätigung, heute gültig); nicht-leer = jedes Element " +
+      "1:1 übernehmen (Art/Datum wie geliefert), Red-Flag gegenüber Bieter-" +
+      "Dokumenten mit älterem Ausstellungsdatum. Nicht werten, nur liefern.",
+    parameters: Type.Object({
+      fn: Type.String({ description: "Firmenbuchnummer, z.B. 127011g" }),
+    }),
+    execute: async (_id, params) => {
+      emit({ t: "tool_call", name: "insolvenz_abrufen", params });
+      let out: unknown;
+      try {
+        out = await callFi(API, `insolvenz/${params.fn}`, {}, TOKEN, throttle);
+        emit({
+          t: "tool_result",
+          name: "insolvenz_abrufen",
+          ok: Array.isArray((out as any)?.proceedings),
+          verfahren: Array.isArray((out as any)?.proceedings) ? (out as any).proceedings.length : undefined,
+        });
+      } catch (err) {
+        out = { error: String(err).slice(0, 200) };
+        emit({ t: "tool_result", name: "insolvenz_abrufen", ok: false });
+      }
+      return { content: [{ type: "text", text: JSON.stringify(out) }], details: {} };
+    },
+  });
+
+  pi.registerTool({
     name: "gisa_abrufen",
     label: "GISA-Gewerbeberechtigungen (Register)",
     description:
