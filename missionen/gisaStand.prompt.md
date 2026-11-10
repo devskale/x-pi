@@ -34,7 +34,8 @@ nur benannt, nie gewertet.
    ```
    Keine eigenen Schlüsse („deckt die Ausschreibung") — NUR Registerdaten.
 4. **Read-back prüfen** (Tool-Ergebnis): fn + count + Gewerbe-Anzahl stimmen.
-5. **Abschlussbericht** als ```json mit denselben Feldern.
+5. **Abschlussbericht**: Antworte zum Schluss NUR mit einem ```json-Block
+   mit denselben Feldern. Kein Text davor. Kein Text danach.
 
 ## Regeln
 

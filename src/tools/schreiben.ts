@@ -40,7 +40,7 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
     parameters: Type.Object({
       project: Type.String(),
       bidder: Type.String(),
-      fakt: Type.Optional(Type.String({ description: "gf_stand (Default) | preise_check | sammeldok_index" })),
+      fakt: Type.Optional(Type.String({ description: "gf_stand (Default) | gisa_stand | preise_check | sammeldok_index" })),
       payload: Type.Record(Type.String(), Type.Unknown()),
     }),
     execute: async (_id, params) => {
@@ -81,6 +81,18 @@ export function schreibenTool(cfg: FbPiKonfig, version: string): (pi: ExtensionA
                 && steht.teildokumente.length === (p.teildokumente?.length ?? 0),
               dokument: steht?.dokument ?? null,
               n_teildokumente: Array.isArray(steht?.teildokumente) ? steht.teildokumente.length : 0,
+            };
+          } else if (fakt === "gisa_stand") {
+            read_back = {
+              ok: !!steht
+                && steht.fn === p.fn
+                && steht.count === p.count
+                && Array.isArray(steht.gewerbe)
+                && steht.gewerbe.length === (p.gewerbe?.length ?? 0),
+              fn: steht?.fn ?? null,
+              count: steht?.count ?? null,
+              amtlich_leer: steht?.amtlich_leer ?? null,
+              n_gewerbe: Array.isArray(steht?.gewerbe) ? steht.gewerbe.length : 0,
             };
           } else if (fakt === "preise_check") {
             read_back = {
